@@ -101,7 +101,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const newRoomId = () => {
     for (;;) {
-      const id = String(randomInt(100000, 1000000));
+      const id = String(randomInt(1000, 10000));
       if (!rooms.has(id)) return id;
     }
   };

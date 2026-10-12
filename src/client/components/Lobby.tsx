@@ -87,10 +87,6 @@ export function SettingsForm({
         <input type="checkbox" checked={value.expansion} onChange={(e) => up({ expansion: e.target.checked })} />
         牌型擴充包（二元／二風、連面子、鏡面子、四歸一、十三不搭、對稱類等 20 個牌型）
       </label>
-      <label className="check">
-        <input type="checkbox" checked={value.smallHandLimit} onChange={(e) => up({ smallHandLimit: e.target.checked })} />
-        小牌限制（每輪只能和一次未滿 20 分的牌）
-      </label>
       <label>
         和牌最低分數
         <NumInput min={0} max={320} value={value.minWinScore} onChange={(v) => up({ minWinScore: v ?? 0 })} />
@@ -119,10 +115,6 @@ export function SettingsForm({
                 <label>
                   基本底分
                   <NumInput min={0} max={160} placeholder={value.advanced ? '0' : '20'} value={h.baseScore} onChange={(baseScore) => setH({ baseScore })} />
-                </label>
-                <label className="check">
-                  <input type="checkbox" checked={!!h.exemptSmallHand} onChange={(e) => setH({ exemptSmallHand: e.target.checked })} />
-                  解除小牌限制
                 </label>
               </div>
             );
@@ -180,7 +172,7 @@ export function LobbyScreen({ state }: { state: AppState }) {
             send({ t: 'joinRoom', roomId: code.trim() });
           }}
         >
-          <input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="6 位數房號" />
+          <input inputMode="numeric" maxLength={4} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="4 位數房號" />
           <button type="submit" className="primary" disabled={code.length !== 6}>
             加入
           </button>

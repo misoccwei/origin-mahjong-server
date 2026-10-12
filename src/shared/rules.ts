@@ -59,7 +59,7 @@ export function defaultSettings(playerCount: 2 | 3 | 4 = 4): RuleSettings {
     rounds: DEFAULT_ROUNDS[playerCount],
     advanced: true,
     minWinScore: 20,
-    expansion: false,
+    expansion: true,
     aiLevel: 'easy',
     passThree: true,
     scoring: 'additive',

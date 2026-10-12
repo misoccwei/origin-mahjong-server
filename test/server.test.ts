@@ -206,7 +206,7 @@ describe('房間', () => {
     const host = await client('Host1');
     host.send({ t: 'createRoom', settings: { playerCount: 2 } });
     const room = await host.waitFor(() => host.room);
-    expect(room.id).toMatch(/^\d{6}$/);
+    expect(room.id).toMatch(/^\d{4}$/);
     expect(room.settings.rounds).toBe(2);
     const b = await client('B1');
     b.send({ t: 'joinRoom', roomId: room.id });
