@@ -353,12 +353,12 @@ function tileYaku(all: TileKind[], input: WinInput, hits: YakuHit[]) {
   if (openMelds === 0) hits.push(hit('1.0'));
   if (openMelds === 4) hits.push(hit('1.1'));
   if (input.advanced) {
-    // 7.1 數鄰：只有 N 個連續數字的數牌（不含字牌）
+    // 7.1 數鄰：只有 N 個連續數字的數牌（不含字牌），而且範圍內每個數字都要出現（例如 7、9 沒有 8 不算三數鄰）
     if (!hasHonor) {
-      const nums = all.map(numOf);
+      const nums = new Set(all.map(numOf));
       const span = Math.max(...nums) - Math.min(...nums) + 1;
-      const t7: Record<number, string> = { 1: '7.1.4', 2: '7.1.4', 3: '7.1.3', 4: '7.1.2', 5: '7.1.1' };
-      if (t7[span]) hits.push(hit(t7[span]));
+      const t7: Record<number, string> = { 2: '7.1.4', 3: '7.1.3', 4: '7.1.2', 5: '7.1.1' };
+      if (nums.size === span && t7[span]) hits.push(hit(t7[span]));
     }
     // 8.3 九蓮寶燈：不鳴牌、清一色、含 1～9、1 與 9 各三張以上
     if (input.melds.length === 0 && suits.size === 1 && !hasHonor) {
@@ -560,8 +560,9 @@ function expansionGroupYaku(groups: Group[], input: WinInput, hits: YakuHit[]) {
   }
   const mirrors = countMirrorPairs(seqs) + countMirrorPairs(numTris);
   const all = allTilesOf(input);
-  const twoSuitsOnly = !all.some(isHonor) && new Set(all.map(suitOf)).size === 2;
-  if (twoSuitsOnly && mirrors >= 2) hits.push(hit('9.5.2'));
+  // 鏡同和：兩組鏡面子是同樣的兩種花色（四組面子都是數牌、只用兩種花色）；雀頭不限，什麼牌都可以
+  const setSuits = new Set(sets.map((g) => (isHonor(g.kind) ? -1 : suitOf(g.kind))));
+  if (!setSuits.has(-1) && setSuits.size === 2 && mirrors >= 2) hits.push(hit('9.5.2'));
   if (mirrors > 0) hits.push(hit('9.5.1', mirrors));
   // 9.6 三色連環、9.7 三色連跳（花色相異、公差一致）
   const has3 = (items: TileKind[], nums: number[]) =>

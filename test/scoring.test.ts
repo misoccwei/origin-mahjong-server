@@ -148,6 +148,24 @@ describe('牌型擴充包', () => {
     expect(score({ hand: '🀊🀍🀝🀠🀖🀘🀀🀁🀂🀃🀄🀅🀆', win: '🀆', ...X })).toBeNull();
   });
 
+  it('回歸：數鄰的範圍內每個數字都要出現（777m 999p 777p 999s 99m 只有 7、9，不算三數鄰）', () => {
+    const n = names({ hand: '🀍🀍🀍🀡🀡🀡🀟🀟🀟🀘🀘🀘🀏', win: '🀏', ...X });
+    expect(n.some((x) => x.includes('數鄰'))).toBe(false);
+    // 補上 8 就成立
+    expect(names({ hand: '🀍🀍🀍🀡🀡🀡🀟🀟🀟🀖🀗🀘🀏', win: '🀏', ...X })).toContain('三數鄰');
+  });
+
+  it('鏡同和：兩組鏡面子是同樣的兩種花色，雀頭不限', () => {
+    // 234m 567m 234s 567s ＋ 雀頭 22p（第三種花色）
+    expect(names({ hand: '🀈🀉🀊🀋🀌🀍🀑🀒🀓🀔🀕🀚🀚', win: '🀖', ...X })).toContain('鏡同和');
+    // 雀頭是字牌也可以
+    expect(names({ hand: '🀈🀉🀊🀋🀌🀍🀑🀒🀓🀔🀕🀀🀀', win: '🀖', ...X })).toContain('鏡同和');
+    // 兩組鏡面子的花色不同（萬筒＋萬索）：只有鏡面子
+    const n = names({ hand: '🀈🀉🀊🀋🀌🀍🀚🀛🀜🀔🀕🀀🀀', win: '🀖', ...X });
+    expect(n).toContain('鏡面子');
+    expect(n).not.toContain('鏡同和');
+  });
+
   it('同系列只取最高分：大二元與小三元同時成立時只計小三元', () => {
     const n = names({ hand: '🀞🀟🀠🀓🀔🀕🀆🀅🀅🀅', melds: [meld('🀄🀄🀄')], win: '🀆', ...X });
     expect(n).toContain('小三元');
