@@ -1,0 +1,32 @@
+{
+  "name": "origin-mahjong-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "《原點麻將》多人連線伺服器與網頁客戶端",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "start": "NODE_ENV=production tsx src/server/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "tsx": "4.21.0",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@types/ws": "8.18.1",
+    "@vitejs/plugin-react": "5.1.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "5.9.3",
+    "vite": "7.1.12",
+    "vitest": "3.2.4"
+  }
+}

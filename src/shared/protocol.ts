@@ -1,0 +1,190 @@
+// Client <-> Server 訊息格式（WebSocket，JSON）
+import type { AILevel, Meld, RuleSettings } from './rules.js';
+import type { HandScore } from './scoring.js';
+import type { SettlementLine } from './settlement.js';
+import type { TileId, TileKind } from './tiles.js';
+
+/**
+ * 前後端協定版本。改動這個檔案的訊息或快照格式時一定要加一，
+ * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
+ * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
+ */
+export const PROTOCOL_VERSION = 3;
+
+// ---- 遊戲行動 ----
+
+export type GameAction =
+  | { type: 'discard'; tile: TileId }
+  | { type: 'tsumo' }
+  | { type: 'ankan'; kind: TileKind }
+  | { type: 'kakan'; kind: TileKind }
+  | { type: 'ron' }
+  | { type: 'pon' }
+  | { type: 'minkan' }
+  | { type: 'chi'; tiles: [TileId, TileId] }
+  | { type: 'pass' }
+  /** 換三張；tiles 為 null 表示不換 */
+  | { type: 'passThree'; tiles: TileId[] | null };
+
+export interface AvailableActions {
+  kind: 'turn' | 'claim' | 'chankan' | 'passThree';
+  discard?: TileId[];
+  tsumo?: boolean;
+  ankan?: TileKind[];
+  kakan?: TileKind[];
+  ron?: boolean;
+  pon?: boolean;
+  minkan?: boolean;
+  chi?: [TileId, TileId][];
+  /** 聽牌時，打出各張牌後所聽的牌（提示用） */
+  tenpaiHints?: Record<number, TileKind[]>;
+}
+
+// ---- 狀態快照 ----
+
+export interface DiscardView {
+  tile: TileId;
+  /** 被他人鳴走 */
+  called: boolean;
+}
+
+export interface PlayerView {
+  seat: number;
+  nickname: string | null;
+  userId: string | null;
+  isAI: boolean;
+  /** 由 AI 代打中（真人斷線後由房主決定） */
+  aiControlled: boolean;
+  /** 開啟自動摸打 */
+  autoPlay: boolean;
+  connected: boolean;
+  /** 牌局中途離開的座位 */
+  left: boolean;
+  ready: boolean;
+  score: number;
+  wind: TileKind | null;
+  handCount: number;
+  hasDrawn: boolean;
+  /** 暗槓在局結束前對其他人以 -1 遮蔽 */
+  melds: Meld[];
+  discards: DiscardView[];
+}
+
+export interface WinnerView {
+  seat: number;
+  tsumo: boolean;
+  from?: number;
+  tile: TileId;
+  score: HandScore;
+}
+
+export interface HandResultView {
+  kind: 'win' | 'draw';
+  winners: WinnerView[];
+  /** 聽牌者；best 是得分最高的和法（和哪張、自摸或銃和、牌型），聽牌得分依它計算 */
+  tenpai: { seat: number; maxScore: number; waits: TileKind[]; best: { tile: TileKind; tsumo: boolean; score: HandScore } }[];
+  deltas: number[];
+  lines: SettlementLine[];
+  /** 只含看得到的手牌：自己、和牌者、聽牌者、主動展示者；其他座位為空陣列 */
+  hands: TileId[][];
+  melds: Meld[][];
+  /** 主動展示手牌的座位 */
+  shown: number[];
+  /** 已按下「下一局」的座位 */
+  acknowledged: number[];
+}
+
+export interface HandHistoryEntry {
+  handNo: number;
+  startSeat: number;
+  kind: 'win' | 'draw';
+  winners: { seat: number; total: number; tsumo: boolean; from?: number; yaku: string[] }[];
+  deltas: number[];
+}
+
+export interface GameView {
+  handNo: number; // 1-based
+  totalHands: number;
+  startSeat: number;
+  phase: 'passThree' | 'passReveal' | 'turn' | 'claim' | 'chankan' | 'result';
+  currentSeat: number;
+  wallRemaining: number;
+  deadWall: number;
+  myHand: TileId[];
+  myDrawn: TileId | null;
+  lastDiscard: { seat: number; tile: TileId } | null;
+  /** 最近一張還在河裡的捨牌（顯示在牌桌中央，直到下一張捨牌或被鳴走） */
+  recentDiscard: { seat: number; tile: TileId } | null;
+  kakanTile: { seat: number; tile: TileId } | null;
+  pending: AvailableActions | null;
+  /** 正在等待哪些座位做決定 */
+  waitingSeats: number[];
+  deadline: number | null;
+  passThreeDone: boolean[];
+  /** 換三張：自己換出與收到的牌（沒有交換為 null），整局都會保留 */
+  passSent: TileId[] | null;
+  passReceived: TileId[] | null;
+  /** 自己聽牌時所聽的牌與剩餘張數（只計自己看得到的牌） */
+  myWaits: { kind: TileKind; left: number }[];
+  /** 自己的自動摸打設定 */
+  auto: { on: boolean; onlyMax: boolean };
+  result: HandResultView | null;
+  /** 小牌限制：本輪是否還能和小牌 */
+  smallHandAvailable: boolean[];
+}
+
+export interface PauseView {
+  disconnectedSeats: number[];
+  deciderSeat: number | null;
+}
+
+export interface RoomView {
+  id: string;
+  hostSeat: number;
+  status: 'waiting' | 'playing' | 'finished';
+  settings: RuleSettings;
+  players: PlayerView[];
+  mySeat: number | null;
+  paused: PauseView | null;
+  history: HandHistoryEntry[];
+  /** 牌局被解散（提前結束） */
+  dissolved: boolean;
+}
+
+// ---- 訊息 ----
+
+export type ClientMessage =
+  | { t: 'auth'; alg: 'Ed25519' | 'ECDSA-P256'; publicKey: JsonWebKey; signature: string; protocol: number }
+  | { t: 'setNickname'; name: string }
+  | { t: 'createRoom'; settings?: Partial<RuleSettings> }
+  | { t: 'joinRoom'; roomId: string }
+  | { t: 'leaveRoom' }
+  | { t: 'updateSettings'; settings: Partial<RuleSettings> }
+  | { t: 'addAI' }
+  | { t: 'removeSeat'; seat: number }
+  | { t: 'ready'; ready: boolean }
+  /** 房主開始牌局 */
+  | { t: 'start' }
+  /** 自動摸打；onlyMax = 只和這副聽牌的最高分 */
+  | { t: 'setAuto'; on: boolean; onlyMax: boolean }
+  /** 房主調整電腦難度（等待中或牌局中皆可，立即生效） */
+  | { t: 'setAILevel'; level: AILevel }
+  /** 局結束時展示自己的手牌 */
+  | { t: 'showHand' }
+  | { t: 'action'; handNo: number; action: GameAction }
+  | { t: 'nextHand' }
+  | { t: 'decide'; choice: 'ai' | 'dissolve' }
+  | { t: 'extend' }
+  | { t: 'restart' }
+  | { t: 'ping' };
+
+export type ServerMessage =
+  | { t: 'challenge'; nonce: string; protocol: number }
+  | { t: 'authOk'; userId: string; nickname: string | null }
+  | { t: 'nicknameOk'; nickname: string }
+  | { t: 'state'; room: RoomView | null; game: GameView | null; now: number }
+  | { t: 'error'; code: string; message: string }
+  | { t: 'kicked'; reason: string }
+  | { t: 'pong' };
+
+export const AUTH_PREFIX = 'origin-mahjong-auth:';
