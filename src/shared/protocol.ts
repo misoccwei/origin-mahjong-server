@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 // ---- 遊戲行動 ----
 
@@ -65,7 +65,7 @@ export interface PlayerView {
   wind: TileKind | null;
   handCount: number;
   hasDrawn: boolean;
-  /** 暗槓在局結束前對其他人以 -1 遮蔽 */
+  /** 他人的暗槓一律以 -1 遮蔽（局結束後也是） */
   melds: Meld[];
   discards: DiscardView[];
 }

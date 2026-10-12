@@ -696,7 +696,7 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
                 </div>
                 <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: t.best.tile }} />
                 <YakuChips score={t.best.score} totalLabel="最高和牌分數" />
-                {capped && <div className="small muted">聽牌得分不超過和牌者的和牌分數，實得 {d} 分</div>}
+                {capped && <div className="small muted">聽牌得分不超過和牌者的得分，實得 {d} 分</div>}
               </section>
             );
           }

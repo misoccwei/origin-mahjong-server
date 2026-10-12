@@ -1,5 +1,5 @@
 import type { GameAction, GameView, PlayerView, RoomSummary, RoomView } from '../shared/protocol.js';
-import { sanitizeSettings, type AILevel, type RuleSettings } from '../shared/rules.js';
+import { sanitizeSettings, type AILevel, type Meld, type RuleSettings } from '../shared/rules.js';
 import { autoAction, decideAction } from './engine/ai.js';
 import type { Rng } from './engine/hand.js';
 import { Match } from './engine/match.js';
@@ -43,6 +43,8 @@ export interface RoomDeps {
 export type RoomResult = { ok: true } | { ok: false; error: string };
 const ok: RoomResult = { ok: true };
 const fail = (error: string): RoomResult => ({ ok: false, error });
+/** 他人的暗槓：牌以 -1 遮蔽 */
+const maskAnkan = (melds: Meld[]): Meld[] => melds.map((m) => (m.type === 'ankan' ? { ...m, tiles: m.tiles.map(() => -1) } : m));
 
 export class Room {
   readonly id: string;
@@ -635,7 +637,7 @@ export class Room {
       wind: hand ? hand.seatWind(i) : null,
       handCount: hand ? hand.hands[i].length : 0,
       hasDrawn: !!hand && hand.phase === 'turn' && hand.current === i && hand.drawn !== null,
-      melds: hand ? hand.melds[i].map((m) => (m.type === 'ankan' && i !== mySeat && hand.phase !== 'ended' ? { ...m, tiles: m.tiles.map(() => -1) } : m)) : [],
+      melds: hand ? (i === mySeat ? hand.melds[i] : maskAnkan(hand.melds[i])) : [],
       discards: hand ? hand.discards[i].map((d) => ({ tile: d.tile, called: d.called })) : [],
     }));
     return {
@@ -662,6 +664,8 @@ export class Room {
     const mine = seat >= 0;
     const phase = hand.phase === 'ended' ? 'result' : hand.phase;
     const r = hand.result;
+    // 局結果中看得到手牌的座位（自己、和牌者、聽牌者、主動展示者）：連同暗槓一起公開
+    const revealed = (i: number) => i === seat || this.shown.has(i) || !!r?.winners.some((w) => w.seat === i) || !!r?.tenpai.some((t) => t.seat === i);
     return {
       handNo: m.handIndex + 1,
       totalHands: m.totalHands,
@@ -697,10 +701,8 @@ export class Room {
             tenpai: r.tenpai,
             deltas: r.deltas,
             lines: r.lines,
-            hands: r.hands.map((h, i) =>
-              i === seat || this.shown.has(i) || r.winners.some((w) => w.seat === i) || r.tenpai.some((t) => t.seat === i) ? h : [],
-            ),
-            melds: r.melds,
+            hands: r.hands.map((h, i) => (revealed(i) ? h : [])),
+            melds: r.melds.map((ms, i) => (revealed(i) ? ms : maskAnkan(ms))),
             shown: [...this.shown],
             acknowledged: [...this.acks],
           }

@@ -325,10 +325,10 @@ describe('結算', () => {
     expect(settle(s, [win(105, 85, 0, false, 1)], []).deltas).toEqual([105, 0, 0, 0]);
   });
 
-  it('加分式進階：和牌×2，聽牌得分不超過和牌者的原始和牌分數（不乘 2）', () => {
+  it('加分式進階：和牌×2，聽牌得分不超過和牌者的得分（和牌分數×2）', () => {
     const s = { ...defaultSettings(4), advanced: true };
-    const r = settle(s, [win(15, 15, 0, false, 1)], [{ seat: 2, maxScore: 95 }, { seat: 3, maxScore: 10 }]);
-    expect(r.deltas).toEqual([30, 0, 15, 10]);
+    const r = settle(s, [win(15, 15, 0, false, 1)], [{ seat: 2, maxScore: 95 }, { seat: 3, maxScore: 20 }]);
+    expect(r.deltas).toEqual([30, 0, 30, 20]);
   });
 
   it('加分式進階：流局時聽牌得分不設限', () => {
