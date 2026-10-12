@@ -43,6 +43,7 @@ const MIME: Record<string, string> = {
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
   '.woff2': 'font/woff2',
 };
 
@@ -199,7 +200,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'showHand':
         return reply(c, room.showHand(userId));
       case 'setAuto':
-        return reply(c, room.setAuto(userId, !!msg.on, !!msg.onlyMax));
+        return reply(c, room.setAuto(userId, !!msg.on, !!msg.win, !!msg.onlyMax));
       case 'action':
         if (!msg.action || typeof msg.action !== 'object') return;
         return reply(c, room.action(userId, Number(msg.handNo), msg.action));

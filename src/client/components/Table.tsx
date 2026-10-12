@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
 import type { HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
@@ -109,20 +109,6 @@ function NamePlate({ p, room, game, pos }: { p: PlayerView; room: RoomView; game
   );
 }
 
-/** 換三張的按鈕（放在手牌上方） */
-function ActionBar({ game, selected, setSelected }: { game: GameView; selected: TileId[]; setSelected: (s: TileId[]) => void }) {
-  const p = game.pending;
-  if (p?.kind !== 'passThree') return <div className="action-bar" />;
-  return (
-    <div className="action-bar">
-      <button className="primary" disabled={selected.length !== 3} onClick={() => (act({ type: 'passThree', tiles: selected }), setSelected([]))}>
-        換出這 3 張
-      </button>
-      <button onClick={() => (act({ type: 'passThree', tiles: null }), setSelected([]))}>不換</button>
-    </div>
-  );
-}
-
 /**
  * 吃碰槓和、自摸、暗槓／加槓：大按鈕疊在牌桌下緣、手牌正上方。
  * 不放正中間：中間顯示著剛打出的牌，碰／吃時需要看得到是哪一張。
@@ -171,30 +157,79 @@ function Waits({ waits }: { waits: GameView['myWaits'] }) {
   );
 }
 
-function MyArea({ room, game, onPoint, showReco, toggleReco }: {
+/** ⚙ 選單：較少用的設定（只和最高分、電腦難度、全螢幕、離開），收起來讓工具列在手機上一排放得下 */
+function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
+  const [open, setOpen] = useState(false);
+  const [fs, setFs] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
+  useEffect(() => {
+    const on = () => setFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  const canFullscreen = typeof document !== 'undefined' && !!document.fullscreenEnabled;
+  return (
+    <div className="tools-menu">
+      <button className={`chip-btn ${open ? 'on' : ''}`} aria-expanded={open} aria-label="更多設定" onClick={() => setOpen((v) => !v)}>
+        ⚙
+      </button>
+      {open && (
+        <div className="menu-pop" role="menu">
+          <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
+            <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
+            只和最高分
+          </label>
+          {room.players.some((p) => p.isAI || p.aiControlled) && (
+            <label className="toggle">
+              電腦
+              <AILevelSelect value={room.settings.aiLevel} disabled={room.mySeat !== room.hostSeat} onChange={(level) => send({ t: 'setAILevel', level })} />
+            </label>
+          )}
+          {canFullscreen && (
+            <button onClick={() => (fs ? document.exitFullscreen() : document.documentElement.requestFullscreen({ navigationUI: 'hide' })).catch(() => {})}>
+              {fs ? '離開全螢幕' : '全螢幕'}
+            </button>
+          )}
+          <button className="danger" onClick={() => confirm('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？') && send({ t: 'leaveRoom' })}>
+            離開牌局
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 自己的手牌與操作。回傳幾個區塊，由牌桌依直式／橫式擺放：
+ * top = 提示列（聽牌、打出後聽…）、hand = 手牌、tools = 工具列、boardOverlay = 疊在牌桌上的換三張選牌區。
+ */
+function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   room: RoomView;
   game: GameView;
   onPoint: (k: TileKind | null) => void;
   showReco: boolean;
   toggleReco: () => void;
+  landscape: boolean;
 }) {
   const me = room.players[room.mySeat!];
   const [selected, setSelected] = useState<TileId[]>([]);
   const [hover, setHover] = useState<TileKind | null>(null);
   const p = game.pending;
   useEffect(() => setSelected([]), [game.handNo, p?.kind]);
-  const hand = game.myHand.filter((t) => t !== game.myDrawn);
+  const passing = p?.kind === 'passThree';
+  // 換三張時，選中的牌會「移出」手牌、放進候選格
+  const hand = game.myHand.filter((t) => t !== game.myDrawn && !(passing && selected.includes(t)));
   const hints = p?.tenpaiHints ?? {};
   // 指著的牌：滑鼠移到的牌，或（手機）點選中的那一張
-  const pointKind = hover ?? (selected.length === 1 ? kindOf(selected[0]) : null);
+  const pointKind = hover ?? (!passing && selected.length === 1 ? kindOf(selected[0]) : null);
   useEffect(() => onPoint(pointKind), [pointKind, onPoint]);
   const shownHint = pointKind !== null ? hints[pointKind] : undefined;
 
   const onTile = (t: TileId) => {
     if (!p) return;
-    if (p.kind === 'passThree') {
-      // 已選 3 張時再點別張：換掉最早選的那張，不用先取消
-      setSelected((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t].slice(-3)));
+    if (passing) {
+      // 候選格滿了再點別張：最早選的那張回到手牌
+      setSelected((cur) => [...cur, t].slice(-3));
+      setHover(null);
       return;
     }
     if (p.kind !== 'turn') return;
@@ -203,14 +238,8 @@ function MyArea({ room, game, onPoint, showReco, toggleReco }: {
       setSelected([]);
     } else setSelected([t]);
   };
-  const clickable = !!p && (p.kind === 'turn' || p.kind === 'passThree');
-  const tileProps = (t: TileId) => ({
-    tile: t,
-    selected: selected.includes(t),
-    highlight: !!hints[kindOf(t)] && p?.kind === 'turn',
-  });
-  const setAuto = (on: boolean, onlyMax: boolean) => send({ t: 'setAuto', on, onlyMax });
-  // 點選一張牌後，牌的上方出現「打出」按鈕（手機上比再點一次好按）
+  const clickable = !!p && (p.kind === 'turn' || passing);
+  const setAuto = (patch: Partial<GameView['auto']>) => send({ t: 'setAuto', ...game.auto, ...patch });
   // 點擊與滑鼠事件放在不會移動的外框上：牌浮起來時不會從游標下滑走而抖動、點不到
   const tileSlot = (t: TileId) => (
     <span
@@ -221,7 +250,7 @@ function MyArea({ room, game, onPoint, showReco, toggleReco }: {
       onMouseEnter={() => setHover(kindOf(t))}
       onMouseLeave={() => setHover(null)}
     >
-      <Tile {...tileProps(t)} />
+      <Tile tile={t} selected={!passing && selected.includes(t)} highlight={!!hints[kindOf(t)] && p?.kind === 'turn'} />
       {p?.kind === 'turn' && selected.length === 1 && selected[0] === t && (
         <button className="discard-btn" onClick={(e) => (e.stopPropagation(), act({ type: 'discard', tile: t }), setSelected([]))}>
           打出
@@ -230,83 +259,89 @@ function MyArea({ room, game, onPoint, showReco, toggleReco }: {
     </span>
   );
 
-  return (
-    <div className="my-area">
-      <div className="my-top">
-        <div className="hint-line">
-          {shownHint ? (
-            <>
-              打出後聽：
-              {shownHint.map((k) => (
-                <Tile key={k} kind={k} small />
-              ))}
-            </>
-          ) : game.phase === 'passReveal' ? (
-            game.passReceived ? '收到換來的 3 張牌，倒數結束後放進手牌' : '這次沒有換到牌'
-          ) : game.myWaits.length > 0 ? (
-            <Waits waits={game.myWaits} />
-          ) : p?.kind === 'turn' ? (
-            '點選一張牌，再按「打出」或再點一次'
-          ) : p?.kind === 'passThree' ? (
-            <span className="pass-tray">
-              換出：
-              {[0, 1, 2].map((i) =>
-                selected[i] !== undefined ? (
-                  <span key={selected[i]} className="tray-tile" title="點一下取消" onClick={() => setSelected((cur) => cur.filter((x) => x !== selected[i]))}>
-                    <Tile tile={selected[i]} small />
-                  </span>
-                ) : (
-                  <span key={'empty' + i} className="tray-empty" />
-                ),
-              )}
-              <span className="muted small">{selected.length < 3 ? `再選 ${3 - selected.length} 張` : '選好了'}</span>
-            </span>
-          ) : (
-            ''
-          )}
-        </div>
-        <ActionBar game={game} selected={selected} setSelected={setSelected} />
-      </div>
-      <div className="my-hand" style={{ '--n': hand.length + (game.myDrawn !== null ? 1.5 : 0) } as CSSProperties}>
-        {hand.map(tileSlot)}
-        {game.myDrawn !== null && (
-          <span className="drawn-gap">
-            {tileSlot(game.myDrawn)}
-          </span>
+  const top = (
+    <div className="my-top">
+      <div className="hint-line">
+        {shownHint ? (
+          <>
+            打出後聽：
+            {shownHint.map((k) => (
+              <Tile key={k} kind={k} small />
+            ))}
+          </>
+        ) : game.phase === 'passReveal' ? (
+          game.passReceived ? '收到換來的 3 張牌，倒數結束後放進手牌' : '這次沒有換到牌'
+        ) : game.myWaits.length > 0 ? (
+          <Waits waits={game.myWaits} />
+        ) : p?.kind === 'turn' ? (
+          '點選一張牌，再按「打出」或再點一次'
+        ) : passing ? (
+          '點手牌把要換出的牌放進候選格，點候選格可以放回手牌'
+        ) : (
+          ''
         )}
-        <span className="my-melds">
-          {me.melds.map((m, i) => (
-            <MeldView key={i} meld={m} />
-          ))}
-        </span>
-      </div>
-      <div className="my-tools">
-        <button className={`icon-btn ${showReco ? 'on' : ''}`} onClick={toggleReco} title="推薦牌型" aria-pressed={showReco}>
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2Zm-2 18h4v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1Z" />
-          </svg>
-          推薦牌型
-        </button>
-        <label className="toggle">
-          <input type="checkbox" checked={game.auto.on} onChange={(e) => setAuto(e.target.checked, game.auto.onlyMax)} />
-          自動摸打
-        </label>
-        <label className={`toggle ${game.auto.on ? '' : 'disabled'}`}>
-          <input type="checkbox" disabled={!game.auto.on} checked={game.auto.onlyMax} onChange={(e) => setAuto(true, e.target.checked)} />
-          只和最高分
-        </label>
-        {room.players.some((p) => p.isAI || p.aiControlled) && (
-          <label className="toggle">
-            電腦
-            <AILevelSelect value={room.settings.aiLevel} disabled={room.mySeat !== room.hostSeat} onChange={(level) => send({ t: 'setAILevel', level })} />
-          </label>
-        )}
-        <button className="leave link" onClick={() => confirm('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？') && send({ t: 'leaveRoom' })}>
-          離開
-        </button>
       </div>
     </div>
   );
+
+  const meldTiles = me.melds.reduce((a, m) => a + m.tiles.length + 0.4, 0);
+  const n = hand.length + (game.myDrawn !== null ? 1.5 : 0) + (landscape ? meldTiles : 0);
+  const handEl = (
+    <div className="my-hand" style={{ '--n': n } as CSSProperties}>
+      {hand.map(tileSlot)}
+      {game.myDrawn !== null && <span className="drawn-gap">{tileSlot(game.myDrawn)}</span>}
+      <span className="my-melds">
+        {me.melds.map((m, i) => (
+          <MeldView key={i} meld={m} />
+        ))}
+      </span>
+    </div>
+  );
+
+  const tools = (
+    <div className="my-tools">
+      <button className={`chip-btn ${showReco ? 'on' : ''}`} onClick={toggleReco} aria-pressed={showReco}>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2Zm-2 18h4v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1Z" />
+        </svg>
+        推薦牌型
+      </button>
+      <button className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} onClick={() => setAuto({ win: !game.auto.win })}>
+        自動和牌
+      </button>
+      <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title="只維持這一局，下一局自動關閉" onClick={() => setAuto({ on: !game.auto.on })}>
+        自動摸打
+      </button>
+      <ToolsMenu room={room} game={game} setAuto={setAuto} />
+    </div>
+  );
+
+  // 換三張：候選格疊在牌桌下緣（手牌正上方），點候選格把牌放回手牌
+  const boardOverlay = passing ? (
+    <div className="pass-overlay">
+      <div className="pass-slots">
+        {[0, 1, 2].map((i) =>
+          selected[i] !== undefined ? (
+            <button key={selected[i]} className="pass-slot filled" title="放回手牌" onClick={() => setSelected((cur) => cur.filter((x) => x !== selected[i]))}>
+              <Tile tile={selected[i]} />
+            </button>
+          ) : (
+            <span key={'empty' + i} className="pass-slot" />
+          ),
+        )}
+      </div>
+      <div className="pass-actions">
+        <button className="call pon" disabled={selected.length !== 3} onClick={() => (act({ type: 'passThree', tiles: selected }), setSelected([]))}>
+          換出
+        </button>
+        <button className="call skip" onClick={() => (act({ type: 'passThree', tiles: null }), setSelected([]))}>
+          不換
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  return { top, hand: handEl, tools, boardOverlay };
 }
 
 /** 換三張亮牌：蓋在牌桌正中間，收到的牌翻開；沒有交換時也顯示，避免看出誰沒換 */
@@ -365,7 +400,7 @@ function SwapMini({ game }: { game: GameView }) {
 
 const shantenText = (s: number) => (s < 0 ? '已成形' : s === 0 ? '聽牌' : `向聽 ${s}`);
 
-function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameView; mode: 'beside' | 'below'; onClose: () => void }) {
+function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameView; mode: 'beside' | 'overlay'; onClose: () => void }) {
   const me = room.players[room.mySeat!];
   const { recs, fast } = useMemo(() => {
     // 看得到的牌：自己的手牌、所有人的鳴牌（他人暗槓除外）與還在河裡的捨牌，用來算有效牌還剩幾張
@@ -627,49 +662,104 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
-export function TableScreen({ state }: { state: AppState }) {
-  const room = state.room!;
-  const game = state.game;
-  const now = useNow(state.clockOffset);
+/** 橫式（寬大於高）時，手牌在下、牌桌置中、兩側放工具與面板 */
+function useLandscape() {
+  const query = '(min-aspect-ratio: 5/4)';
+  const [landscape, setLandscape] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setLandscape(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return !!landscape;
+}
+
+function Board({ room, game, now, pointKind, overlay }: { room: RoomView; game: GameView; now: number; pointKind: TileKind | null; overlay: ReactElement | null }) {
   const me = room.mySeat!;
   const n = room.players.length;
-  const [pointKind, setPointKind] = useState<TileKind | null>(null);
-  const [showReco, setShowReco] = useState(false);
-  const recoMode = useRecoMode(!!game);
-  if (!game) return <div className="panel narrow">準備下一局…</div>;
   return (
-    <div className={`table players-${n}`}>
-      <div className="board">
-        <Center room={room} game={game} now={now} />
-        <CallOverlay game={game} />
-        {game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : game.phase !== 'passThree' && <SwapMini game={game} />}
-        {room.players.map((p) => (
-          <Side key={p.seat} p={p} game={game} pos={positionOf(p.seat, me, n)} pointKind={pointKind} />
-        ))}
-        {room.players.map((p) => (
-          <NamePlate key={p.seat} p={p} room={room} game={game} pos={positionOf(p.seat, me, n)} />
-        ))}
-      </div>
-      {showReco && recoMode === 'beside' && <RecoPanel room={room} game={game} mode="beside" onClose={() => setShowReco(false)} />}
-      <MyArea room={room} game={game} onPoint={setPointKind} showReco={showReco} toggleReco={() => setShowReco((v) => !v)} />
-      {showReco && recoMode === 'below' && <RecoPanel room={room} game={game} mode="below" onClose={() => setShowReco(false)} />}
-      {game.phase === 'result' && game.result && <ResultModal room={room} game={game} now={now} />}
-      {room.paused && <PauseOverlay room={room} />}
+    <div className="board">
+      <Center room={room} game={game} now={now} />
+      <CallOverlay game={game} />
+      {overlay}
+      {game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : game.phase !== 'passThree' && <SwapMini game={game} />}
+      {room.players.map((p) => (
+        <Side key={p.seat} p={p} game={game} pos={positionOf(p.seat, me, n)} pointKind={pointKind} />
+      ))}
+      {room.players.map((p) => (
+        <NamePlate key={p.seat} p={p} room={room} game={game} pos={positionOf(p.seat, me, n)} />
+      ))}
     </div>
   );
 }
 
-/** 牌桌旁邊放得下推薦面板就放旁邊，否則放在操作列下方（都不會蓋到牌桌與操作按鈕） */
-function useRecoMode(hasBoard: boolean): 'beside' | 'below' {
-  const [mode, setMode] = useState<'beside' | 'below'>('below');
-  useLayoutEffect(() => {
-    const update = () => {
-      const w = document.querySelector('.board')?.getBoundingClientRect().width ?? window.innerWidth;
-      setMode((window.innerWidth - w) / 2 >= 280 ? 'beside' : 'below');
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [hasBoard]);
-  return mode;
+/**
+ * 牌桌畫面：固定佔滿整個視窗、不捲動。
+ * 直式：牌桌在上（依剩餘空間決定大小），下方是提示列、手牌、工具列；推薦牌型疊在牌桌上。
+ * 橫式：手牌在最下面一排，牌桌置中，左側放提示列與工具列，右側放推薦牌型。
+ */
+export function TableScreen({ state }: { state: AppState }) {
+  const room = state.room!;
+  const game = state.game;
+  const now = useNow(state.clockOffset);
+  const [pointKind, setPointKind] = useState<TileKind | null>(null);
+  const [showReco, setShowReco] = useState(false);
+  const landscape = useLandscape();
+  useEffect(() => {
+    document.body.classList.add('in-game');
+    return () => document.body.classList.remove('in-game');
+  }, []);
+  if (!game) return <div className="panel narrow">準備下一局…</div>;
+  return <TableLayout room={room} game={game} now={now} pointKind={pointKind} setPointKind={setPointKind} showReco={showReco} setShowReco={setShowReco} landscape={landscape} />;
+}
+
+function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setShowReco, landscape }: {
+  room: RoomView;
+  game: GameView;
+  now: number;
+  pointKind: TileKind | null;
+  setPointKind: (k: TileKind | null) => void;
+  showReco: boolean;
+  setShowReco: (f: (v: boolean) => boolean) => void;
+  landscape: boolean;
+}) {
+  const my = useMyArea({ room, game, onPoint: setPointKind, showReco, toggleReco: () => setShowReco((v) => !v), landscape });
+  const board = <Board room={room} game={game} now={now} pointKind={pointKind} overlay={my.boardOverlay} />;
+  const reco = showReco && <RecoPanel room={room} game={game} mode={landscape ? 'beside' : 'overlay'} onClose={() => setShowReco(() => false)} />;
+  const modals = (
+    <>
+      {game.phase === 'result' && game.result && <ResultModal room={room} game={game} now={now} />}
+      {room.paused && <PauseOverlay room={room} />}
+    </>
+  );
+  if (landscape) {
+    return (
+      <div className={`table landscape players-${room.players.length}`}>
+        <div className="stage">
+          <div className="gutter left">
+            {my.top}
+            {my.tools}
+          </div>
+          {board}
+          <div className="gutter right">{reco}</div>
+        </div>
+        {my.hand}
+        {modals}
+      </div>
+    );
+  }
+  return (
+    <div className={`table portrait players-${room.players.length}`}>
+      <div className="stage">
+        {board}
+        {reco}
+      </div>
+      {my.top}
+      {my.hand}
+      {my.tools}
+      {modals}
+    </div>
+  );
 }

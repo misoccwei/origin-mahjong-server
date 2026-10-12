@@ -232,17 +232,30 @@ export function decideAction(hand: Hand, seat: number, level: AILevel = hand.set
   return { type: 'pass' };
 }
 
+export interface AutoOptions {
+  /** 自動摸打：不換牌、不鳴牌、摸什麼打什麼 */
+  play: boolean;
+  /** 自動和牌 */
+  win: boolean;
+  /** 只和這副聽牌的最高分 */
+  onlyMax: boolean;
+}
+
 /**
- * 自動摸打：不換牌、不鳴牌、摸什麼打什麼；可以和就和（onlyMax 時只和這副聽牌的最高分）。
- * 能槓（暗槓、加槓、明槓）時回傳 null：交給玩家自己決定要不要槓。
+ * 自動操作。回傳 null 表示交給玩家自己決定：
+ * - 只開自動和牌時，除了和牌以外都由玩家操作；
+ * - 自動摸打遇到能槓（暗槓、加槓、明槓）時也停下來問玩家。
+ * 自動摸打或自動和牌任一開啟時，可以和就和（onlyMax 時只和這副聽牌的最高分）。
  */
-export function autoAction(hand: Hand, seat: number, onlyMax: boolean): GameAction | null {
+export function autoAction(hand: Hand, seat: number, opts: AutoOptions): GameAction | null {
   const avail = hand.pending.get(seat);
   if (!avail) throw new Error('no pending action');
+  if (!opts.play && !opts.win) return null;
   const preview = avail.tsumo || avail.ron ? hand.winPreview(seat) : null;
-  const takeWin = !!preview && (!onlyMax || preview.score.total >= preview.best);
-  if (avail.kind === 'passThree') return { type: 'passThree', tiles: null };
+  const takeWin = !!preview && (!opts.onlyMax || preview.score.total >= preview.best);
   if (takeWin) return { type: avail.kind === 'turn' ? 'tsumo' : 'ron' };
+  if (!opts.play) return null;
+  if (avail.kind === 'passThree') return { type: 'passThree', tiles: null };
   if (avail.ankan?.length || avail.kakan?.length || avail.minkan) return null;
   return avail.kind === 'turn' ? hand.defaultAction(seat) : { type: 'pass' };
 }

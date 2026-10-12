@@ -69,7 +69,7 @@ function game(patch: Partial<GameView> = {}): GameView {
     passSent: null,
     passReceived: null,
     myWaits: [],
-    auto: { on: false, onlyMax: false },
+    auto: { on: false, win: false, onlyMax: false },
     result: null,
     smallHandAvailable: [true, true, true, true],
     ...patch,
@@ -82,10 +82,23 @@ function render(r: RoomView, g: GameView | null) {
 }
 
 describe('牌桌畫面', () => {
-  it('換三張選牌階段', () => {
+  it('換三張選牌階段：牌桌上有 3 個候選格與換出／不換', () => {
     const html = render(room(), game({ phase: 'passThree', pending: { kind: 'passThree' }, waitingSeats: [0] }));
-    expect(html).toContain('換出這 3 張');
+    expect(html).toMatch(/class="pass-overlay"/);
+    expect((html.match(/class="pass-slot"/g) ?? []).length).toBe(3);
+    expect(html).toMatch(/<button class="call pon" disabled="">換出<\/button>/);
     expect(html).toContain('不換');
+  });
+
+  it('工具列：推薦牌型、自動和牌、自動摸打（開啟時高亮）與 ⚙ 選單', () => {
+    const html = render(room(), game({ auto: { on: true, win: false, onlyMax: false } }));
+    expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動摸打/);
+    expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和牌/);
+    expect(html).toContain('aria-label="更多設定"');
+  });
+
+  it('牌桌固定佔滿畫面：直式用 portrait 版面（伺服器渲染沒有視窗時）', () => {
+    expect(render(room(), game())).toMatch(/class="table portrait players-4"/);
   });
 
   it('換三張亮牌：有交換時顯示換出與收到的牌與倒數，不會顯示「沒有換到牌」', () => {
@@ -126,12 +139,12 @@ describe('牌桌畫面', () => {
 
   it('自動摸打遇到能槓時，問玩家要不要槓（有「不槓（摸切）」）', () => {
     const drawn = t(0, 3);
-    const g = game({ myHand: [...HAND, drawn], myDrawn: drawn, auto: { on: true, onlyMax: false }, pending: { kind: 'turn', discard: [...HAND, drawn], ankan: [0] } });
+    const g = game({ myHand: [...HAND, drawn], myDrawn: drawn, auto: { on: true, win: false, onlyMax: false }, pending: { kind: 'turn', discard: [...HAND, drawn], ankan: [0] } });
     const html = render(room(), g);
     expect(html).toContain('暗槓');
     expect(html).toContain('不槓（摸切）');
     // 沒開自動摸打時不需要這顆按鈕（直接打牌就是不槓）
-    expect(render(room(), { ...g, auto: { on: false, onlyMax: false } })).not.toContain('不槓');
+    expect(render(room(), { ...g, auto: { on: false, win: false, onlyMax: false } })).not.toContain('不槓');
   });
 
   it('聽牌時在手牌上方顯示聽的牌與剩餘張數', () => {
@@ -140,10 +153,7 @@ describe('牌桌畫面', () => {
     expect(html).toContain('×<!-- -->3');
   });
 
-  it('電腦難度：房主可以調整（下拉選單可用），其他人只能看', () => {
-    expect(render(room(), game())).toMatch(/<select(?![^>]*disabled)[^>]*>.*普通/);
-    expect(render(room({ hostSeat: 1 }), game())).toMatch(/<select[^>]*disabled/);
-  });
+
 });
 
 describe('結算畫面', () => {

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1b5e45"/>
+  <circle cx="256" cy="256" r="236" fill="#23785a" opacity="0.6"/>
+  <g transform="translate(256 262) rotate(-6)">
+    <rect x="-118" y="-160" width="236" height="320" rx="28" fill="#c9bf9f"/>
+    <rect x="-118" y="-172" width="236" height="320" rx="28" fill="#fdfcf7"/>
+    <text x="0" y="40" text-anchor="middle" font-family="PingFang TC, Noto Sans TC, Microsoft JhengHei, sans-serif" font-weight="900" font-size="220" fill="#c0392b">中</text>
+  </g>
+</svg>

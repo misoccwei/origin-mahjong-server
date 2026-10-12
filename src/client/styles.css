@@ -21,6 +21,8 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); min-height: 100vh; }
+/* 牌局中：整個畫面固定、不捲動（全螢幕玩法） */
+body.in-game { overflow: hidden; overscroll-behavior: none; }
 #root { min-height: 100vh; padding: 16px; }
 h1, h2, h3 { margin: 0 0 12px; }
 button {
@@ -102,11 +104,21 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 
 /* ---- 牌桌 ---- */
 .table {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  min-height: calc(100vh - 32px); color: #f4f1e8;
-  /* 牌桌（正方形）邊長 */
-  --S: max(300px, min(calc(100vw - 32px), calc(100vh - 210px), 860px));
+  /* 佔滿整個視窗（含瀏覽器網址列收合後的高度），內容不捲動；瀏海與圓角用安全區域避開 */
+  position: fixed; inset: 0; z-index: 1; overflow: hidden; color: #f4f1e8; background: var(--bg);
+  display: flex; flex-direction: column; gap: 4px;
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
 }
+/* 牌桌所在的舞台：用剩下的空間決定牌桌大小（容器查詢單位 cqw／cqh） */
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; container-type: size;
+  display: flex; align-items: center; justify-content: center;
+  /* 牌桌（正方形）邊長；自訂屬性在使用處才計算，所以 cq 單位以 .stage 為準 */
+  --S: min(100cqw, 100cqh);
+}
+/* 直式：多出來的高度留在上方，牌桌貼近手牌（拇指比較好按） */
+.table.portrait .stage { align-items: flex-end; }
+.table.landscape .stage { --gutter-min: clamp(150px, 22cqw, 300px); --S: min(100cqh, calc(100cqw - 2 * var(--gutter-min))); }
 .board {
   position: relative; width: var(--S); height: var(--S); flex: none;
   background: radial-gradient(circle at center, #23785a 0%, var(--felt) 45%, var(--felt-dark) 100%);
@@ -166,25 +178,45 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .nameplate.at-left { left: 2%; top: 2%; }
 .thinking { color: var(--gold); font-weight: 700; margin-left: 4px; }
 
-.my-area { width: min(100%, 960px); display: grid; gap: 4px; }
-.my-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 44px; }
-.hint-line { display: flex; align-items: center; gap: 4px; color: #dfe9e3; font-size: 0.9em; }
+.my-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; flex: none; }
+.hint-line { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; color: #dfe9e3; font-size: 0.9em; }
 .my-hand {
-  /* --n = 手牌張數（摸牌另加間距）；吃碰後張數變少，牌就跟著放大 */
-  --tw: clamp(22px, calc((100vw - 32px) / (var(--n, 14.5) + 1)), 52px);
-  display: flex; flex-wrap: wrap; row-gap: 6px; align-items: flex-end; justify-content: center; padding-top: calc(var(--tw) * 0.3);
+  /* --n = 這一排的張數（摸牌另加間距；橫式時含鳴牌）；張數變少牌就放大。高度也有上限，橫式手機才放得下 */
+  --tw: clamp(20px, min(calc((100vw - 24px) / (var(--n, 14.5) + 1)), 12dvh), 56px);
+  flex: none; display: flex; flex-wrap: wrap; row-gap: 6px; align-items: flex-end; justify-content: center; padding-top: calc(var(--tw) * 0.3);
 }
 .my-melds { margin-left: calc(var(--tw) * 0.5); display: inline-flex; }
-.action-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-.action-bar button { font-size: 1.05em; padding: 8px 18px; }
+/* 直式：吃碰的牌另起一排，手牌那排就能用比較大的牌 */
+.table.portrait .my-melds:not(:empty) { flex-basis: 100%; justify-content: center; margin: 4px 0 0; --tw: clamp(18px, calc((100vw - 32px) / 16), 34px); }
+/* 橫式：兩側欄位（左：提示列與工具列；右：推薦牌型） */
+.gutter {
+  position: absolute; top: 0; bottom: 0; width: calc((100cqw - var(--S)) / 2 - 12px);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.gutter.left { left: 0; }
+.gutter.right { right: 0; overflow: auto; }
+.gutter .my-tools { margin-top: auto; }
 .tile-slot { position: relative; display: inline-flex; }
 /* 外框固定不動，往上多留一點點擊範圍（選中的牌浮起來後仍點得到） */
 .tile-slot.clickable { cursor: pointer; padding-top: calc(var(--tw) * 0.35); margin-top: calc(var(--tw) * -0.35); }
 .tile-slot.clickable:hover > .tile:not(.selected) { transform: translateY(-12%); }
-.pass-tray { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.tray-tile { cursor: pointer; }
-.tray-tile:hover .tile { filter: brightness(0.85); }
-.tray-empty { --tw: 26px; display: inline-block; width: var(--tw); height: calc(var(--tw) * 4 / 3); border: 2px dashed rgba(255, 255, 255, 0.45); border-radius: 4px; }
+/* 換三張：候選格疊在牌桌下緣；選中的牌從手牌移到這裡，點一下放回手牌 */
+.pass-overlay {
+  --tw: max(28px, calc(var(--S) * 0.075));
+  position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: calc(var(--S) * 0.03); padding: calc(var(--S) * 0.015) calc(var(--S) * 0.025);
+  background: rgba(10, 30, 22, 0.85); border-radius: 14px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.pass-slots { display: flex; gap: calc(var(--tw) * 0.15); }
+.pass-slot {
+  width: calc(var(--tw) * 1.06); height: calc(var(--tw) * 4 / 3 + 4px); padding: 0; border-radius: 6px;
+  border: 2px dashed rgba(255, 255, 255, 0.5); background: transparent; display: inline-flex; align-items: flex-end; justify-content: center;
+}
+.pass-slot.filled { border: none; cursor: pointer; animation: pop 0.15s ease-out; }
+.pass-slot.filled:hover:not(:disabled) { background: transparent; filter: brightness(0.9); }
+.pass-actions { display: flex; flex-direction: column; gap: 6px; }
+.pass-actions .call { min-height: max(40px, calc(var(--S) * 0.065)); min-width: max(64px, calc(var(--S) * 0.12)); font-size: max(16px, calc(var(--S) * 0.03)); }
+.pass-actions .call:disabled { opacity: 0.45; }
 .discard-btn {
   position: absolute; left: 50%; bottom: calc(100% + var(--tw) * 0.4); transform: translateX(-50%); z-index: 3;
   padding: 6px 14px; font-size: 1em; font-weight: 700; white-space: nowrap;
@@ -214,11 +246,23 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .call.skip { border-color: rgba(255, 255, 255, 0.5); font-size: max(16px, calc(var(--S) * 0.03)); }
 .call:hover:not(:disabled) { filter: brightness(1.12); }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-.my-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.9em; color: #dfe9e3; }
-.my-tools .leave { margin-left: auto; color: #dfe9e3; }
-.icon-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.3); color: #f4f1e8; border-color: transparent; }
-.icon-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.45); }
-.icon-btn.on { background: var(--gold); color: #fff; }
+.my-tools { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.95em; color: #dfe9e3; }
+.table.portrait .my-tools { justify-content: center; }
+.chip-btn {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3); color: #f4f1e8; border: 1px solid rgba(255, 255, 255, 0.2); white-space: nowrap;
+}
+.chip-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.45); }
+.chip-btn.on, .chip-btn.on:hover:not(:disabled) { background: var(--gold); border-color: var(--gold); color: #fff; }
+.tools-menu { position: relative; }
+.menu-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 220px; white-space: nowrap;
+  background: var(--panel); color: var(--ink); border-radius: 12px; padding: 10px; display: grid; gap: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.gutter .menu-pop { right: auto; left: 0; }
+.menu-pop .toggle { min-height: 36px; }
+.menu-pop select { font-size: 16px; }
+.menu-pop button.danger { color: var(--accent); border-color: #e7b4ad; }
 .toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .toggle.disabled { opacity: 0.5; cursor: default; }
 .wait { display: inline-flex; align-items: flex-end; margin-right: 6px; }
@@ -258,9 +302,10 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 
 /* 推薦牌型：牌桌旁（寬螢幕）或操作列下方（窄螢幕），不蓋到牌桌與操作按鈕 */
 .reco-panel { background: var(--panel); color: var(--ink); border-radius: 12px; padding: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); overflow: auto; z-index: 5; }
-.reco-panel.beside { position: absolute; top: 0; left: calc(50% + var(--S) / 2 + 16px); width: 260px; max-height: var(--S); }
-.reco-panel.below { width: min(100%, 960px); font-size: 0.9em; }
-.reco-panel.below ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.reco-panel.beside { max-height: 100%; }
+/* 直式：疊在牌桌上半部（自己的手牌與按鈕都在牌桌下方，不會被蓋到） */
+.reco-panel.overlay { position: absolute; top: 4px; left: 4px; right: 4px; max-height: 58%; z-index: 8; font-size: 0.9em; }
+.reco-panel.overlay ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .reco-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .reco-fast { border: 1px solid #e2dccb; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
 .reco-panel ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -272,7 +317,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 
 /* ---- 對話框 ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 10; padding: 16px; }
-.modal { background: var(--panel); color: var(--ink); border-radius: 14px; padding: 20px; max-width: 640px; width: 100%; max-height: 90vh; overflow: auto; display: grid; gap: 12px; }
+.modal { background: var(--panel); color: var(--ink); border-radius: 14px; padding: 20px; max-width: 640px; width: 100%; max-height: 90dvh; overflow: auto; display: grid; gap: 12px; }
 .modal.narrow { max-width: 420px; }
 .winner { border: 1px solid #e7e2d3; border-radius: 10px; padding: 10px; }
 .modal.result { max-width: 680px; }
@@ -305,18 +350,14 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 
 @media (max-width: 760px) {
   #root { padding: 8px; }
-  /* 手機：吃碰的牌另起一排，手牌那排就能用比較大的牌 */
-  .my-melds { flex-basis: 100%; justify-content: center; margin: 8px 0 0; --tw: clamp(18px, calc((100vw - 32px) / 16), 34px); }
-  /* 手機：按鈕與勾選框放大，比較好按 */
-  .my-tools { gap: 10px; font-size: 1em; }
-  .icon-btn { padding: 10px 16px; }
-  .toggle { min-height: 44px; }
-  .toggle input { width: 22px; height: 22px; }
-  .my-tools select { font-size: 16px; min-height: 40px; }
-  .action-bar button { min-height: 48px; font-size: 1.1em; }
   .discard-btn { padding: 10px 18px; font-size: 1.1em; }
   /* 結算：手機上牌小一點，一副手牌盡量一排放得下 */
   .modal { padding: 14px; }
   .modal .tile.small { --tw: min(21px, calc((100vw - 96px) / 15.5)); }
-  .table { --S: max(280px, min(calc(100vw - 16px), calc(100vh - 190px))); }
+}
+/* 矮的橫式畫面（手機橫放）：提示文字與按鈕縮小一點 */
+@media (max-height: 500px) {
+  .chip-btn { min-height: 34px; padding: 4px 10px; font-size: 0.9em; }
+  .hint-line { font-size: 0.85em; }
+  .modal { max-height: 96dvh; }
 }

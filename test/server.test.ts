@@ -369,7 +369,7 @@ describe('對局', () => {
     await host.waitFor(() => host.room);
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    host.send({ t: 'setAuto', on: true, onlyMax: false });
+    host.send({ t: 'setAuto', on: true, win: false, onlyMax: false });
     await host.waitFor(() => host.room?.players[0].autoPlay);
     host.send({ t: 'start' });
     await host.waitFor(() => host.game?.phase === 'passReveal');
@@ -402,7 +402,7 @@ describe('對局', () => {
     await host.waitFor(() => host.room);
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    host.send({ t: 'setAuto', on: true, onlyMax: false });
+    host.send({ t: 'setAuto', on: true, win: false, onlyMax: false });
     host.send({ t: 'start' });
     const g = await host.waitFor(() => (answerKan(host), host.game?.phase === 'result' && host.game), 20000);
     const r = g.result!;
@@ -498,6 +498,22 @@ describe('對局', () => {
     const r = await back.waitFor(() => back.room);
     expect(r.status).toBe('playing');
     expect(r.dissolved).toBe(false);
+  });
+
+  it('自動摸打只維持一局（下一局自動關閉），自動和牌持續有效', async () => {
+    const host = await client('AC1');
+    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 0, claimSeconds: 0, passThree: false } });
+    await host.waitFor(() => host.room);
+    host.send({ t: 'addAI' });
+    await host.waitFor(() => host.room?.players[1].nickname);
+    host.send({ t: 'setAuto', on: true, win: true, onlyMax: false });
+    host.send({ t: 'start' });
+    await host.waitFor(() => host.game?.auto.on && host.game.auto.win && host.game);
+    await host.waitFor(() => (answerKan(host), host.game?.phase === 'result'), 20000);
+    host.send({ t: 'nextHand' });
+    const g2 = await host.waitFor(() => host.game?.handNo === 2 && host.game);
+    expect(g2.auto.on).toBe(false);
+    expect(g2.auto.win).toBe(true);
   });
 
   it('逾時自動摸切', async () => {

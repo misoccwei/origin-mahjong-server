@@ -353,12 +353,12 @@ describe('情境', () => {
     const h = new Hand({ settings: { ...defaultSettings(4), passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
     h.start();
     h.drawCount[1] = 1; // 避免成立地和
-    expect(autoAction(h, 0, false)).toEqual({ type: 'discard', tile: h.drawn });
+    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toEqual({ type: 'discard', tile: h.drawn });
     h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
     expect(h.pending.get(1)?.ron).toBe(true);
     expect(h.winPreview(1)).toMatchObject({ score: { total: 10 }, best: 15 });
-    expect(autoAction(h, 1, false)).toEqual({ type: 'ron' });
-    expect(autoAction(h, 1, true)).toEqual({ type: 'pass' });
+    expect(autoAction(h, 1, { play: true, win: false, onlyMax: false })).toEqual({ type: 'ron' });
+    expect(autoAction(h, 1, { play: true, win: false, onlyMax: true })).toEqual({ type: 'pass' });
   });
 
   it('聽牌提示：聽的牌與剩餘張數（扣掉自己看得到的牌）', () => {
@@ -394,12 +394,26 @@ describe('情境', () => {
     // 座位 0 手上三張 🀇、摸到第四張 → 可暗槓
     const h = makeHand(['🀇🀇🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀚', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀇');
     expect(h.pending.get(0)?.ankan).toEqual([uni('🀇')[0]]);
-    expect(autoAction(h, 0, false)).toBeNull();
+    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toBeNull();
     // 座位 3 有三張 🀡：座位 2 打出 🀡 時可明槓
     const h2 = makeHand(['🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀈🀉🀊🀌🀍🀎🀛🀛🀛🀚🀓🀔🀕', '🀡🀇🀇🀈🀈🀉🀉🀙🀚🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀆🀁');
     autoplayUntil(h2, () => h2.current === 2 && h2.phase === 'turn');
     h2.act(2, { type: 'discard', tile: tileOf(h2, 2, '🀡') });
     expect(h2.pending.get(3)?.minkan).toBe(true);
-    expect(autoAction(h2, 3, false)).toBeNull();
+    expect(autoAction(h2, 3, { play: true, win: false, onlyMax: false })).toBeNull();
+  });
+
+  it('自動和牌（沒開自動摸打）：只有能和時才自動，其他交給玩家', () => {
+    const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
+    const h = new Hand({ settings: { ...defaultSettings(4), passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
+    h.start();
+    h.drawCount[1] = 1;
+    const winOnly = { play: false, win: true, onlyMax: false };
+    expect(autoAction(h, 0, winOnly)).toBeNull(); // 輪到自己打牌：不自動
+    h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
+    expect(autoAction(h, 1, winOnly)).toEqual({ type: 'ron' });
+    // 只和最高分：銃和 10 分 < 最高 15 分 → 交給玩家（不自動略過）
+    expect(autoAction(h, 1, { ...winOnly, onlyMax: true })).toBeNull();
+    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false })).toBeNull();
   });
 });

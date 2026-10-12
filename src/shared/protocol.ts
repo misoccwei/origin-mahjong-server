@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 // ---- 遊戲行動 ----
 
@@ -126,8 +126,8 @@ export interface GameView {
   passReceived: TileId[] | null;
   /** 自己聽牌時所聽的牌與剩餘張數（只計自己看得到的牌） */
   myWaits: { kind: TileKind; left: number }[];
-  /** 自己的自動摸打設定 */
-  auto: { on: boolean; onlyMax: boolean };
+  /** 自己的自動設定：on = 自動摸打（下一局自動關閉）、win = 自動和牌 */
+  auto: { on: boolean; win: boolean; onlyMax: boolean };
   result: HandResultView | null;
   /** 小牌限制：本輪是否還能和小牌 */
   smallHandAvailable: boolean[];
@@ -165,8 +165,8 @@ export type ClientMessage =
   | { t: 'ready'; ready: boolean }
   /** 房主開始牌局 */
   | { t: 'start' }
-  /** 自動摸打；onlyMax = 只和這副聽牌的最高分 */
-  | { t: 'setAuto'; on: boolean; onlyMax: boolean }
+  /** 自動摸打（下一局自動關閉）、自動和牌；onlyMax = 只和這副聽牌的最高分 */
+  | { t: 'setAuto'; on: boolean; win: boolean; onlyMax: boolean }
   /** 房主調整電腦難度（等待中或牌局中皆可，立即生效） */
   | { t: 'setAILevel'; level: AILevel }
   /** 局結束時展示自己的手牌 */

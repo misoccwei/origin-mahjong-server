@@ -14,8 +14,10 @@ export interface Seat {
   ready: boolean;
   /** 牌局中途離開 */
   left: boolean;
-  /** 自動摸打（只在自己的座位上生效） */
+  /** 自動摸打（只在這一局有效，下一局自動關閉） */
   autoPlay?: boolean;
+  /** 自動和牌（持續有效） */
+  autoWin?: boolean;
   autoOnlyMax?: boolean;
   /** 等待中斷線的時間（用於等待房間的清理） */
   offlineSince: number | null;
@@ -318,11 +320,12 @@ export class Room {
     return ok;
   }
 
-  setAuto(userId: string, on: boolean, onlyMax: boolean): RoomResult {
+  setAuto(userId: string, on: boolean, win: boolean, onlyMax: boolean): RoomResult {
     const seat = this.seatOf(userId);
     if (seat < 0) return fail('不在房間中');
     const s = this.seats[seat]!;
     s.autoPlay = on;
+    s.autoWin = win;
     s.autoOnlyMax = onlyMax;
     this.afterChange();
     return ok;
@@ -360,7 +363,11 @@ export class Room {
     this.acks.clear();
     this.shown.clear();
     if (m.finished) this.status = 'finished';
-    else m.startHand();
+    else {
+      // 自動摸打只維持一局
+      for (const s of this.seats) if (s) s.autoPlay = false;
+      m.startHand();
+    }
     this.afterChange();
   }
 
@@ -460,7 +467,7 @@ export class Room {
     for (const seat of pendingSeats) {
       if (this.isAISeat(seat)) {
         this.later(this.deps.aiDelayMs, () => this.runAI(seat, wid));
-      } else if (this.seats[seat]!.autoPlay && autoAction(hand, seat, !!this.seats[seat]!.autoOnlyMax)) {
+      } else if (autoAction(hand, seat, this.autoOpts(seat))) {
         this.later(Math.min(this.deps.aiDelayMs, 500), () => this.runAuto(seat, wid));
       } else humanPending = true; // 包含自動摸打遇到能槓、要問玩家的情況
     }
@@ -477,11 +484,16 @@ export class Room {
     this.afterChange();
   }
 
+  private autoOpts(seat: number) {
+    const s = this.seats[seat];
+    return { play: !!s?.autoPlay, win: !!s?.autoWin, onlyMax: !!s?.autoOnlyMax };
+  }
+
   private runAuto(seat: number, wid: string) {
     const hand = this.match?.hand;
     const s = this.seats[seat];
-    if (!hand || !s?.autoPlay || wid !== this.windowId || !hand.pending.has(seat) || this.paused) return;
-    const action = autoAction(hand, seat, !!s.autoOnlyMax);
+    if (!hand || !s || wid !== this.windowId || !hand.pending.has(seat) || this.paused) return;
+    const action = autoAction(hand, seat, this.autoOpts(seat));
     if (!action) return;
     const err = hand.act(seat, action);
     if (err) hand.act(seat, hand.defaultAction(seat));
@@ -574,7 +586,7 @@ export class Room {
       passSent: hand.passSent[seat],
       passReceived: hand.passReceived[seat],
       myWaits: hand.waitsFor(seat),
-      auto: { on: !!this.seats[seat]!.autoPlay, onlyMax: !!this.seats[seat]!.autoOnlyMax },
+      auto: { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: !!this.seats[seat]!.autoOnlyMax },
       result: r
         ? {
             kind: r.kind,
