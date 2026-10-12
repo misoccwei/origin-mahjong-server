@@ -454,3 +454,25 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
   .hint-line { font-size: 0.85em; }
   .modal { max-height: 96dvh; }
 }
+
+/* ---- 語音 ---- */
+.chip-btn.icon { padding: 6px 10px; }
+.chip-btn.speaking { box-shadow: 0 0 0 3px rgba(80, 220, 120, 0.8); }
+.chip-btn.ptt { user-select: none; touch-action: none; }
+.voice-mark { display: inline-flex; align-items: center; margin-left: 4px; vertical-align: middle; opacity: 0.75; }
+.voice-mark svg { width: 13px; height: 13px; }
+.voice-mark.speaking { opacity: 1; color: #4cd47a; }
+.voice-panel { margin: 12px 0; padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.06); }
+.voice-panel-head { display: flex; align-items: center; gap: 8px; }
+.voice-panel-head .voice-btns { display: inline-flex; gap: 6px; margin-right: auto; }
+.voice-panel .chip-btn { background: var(--panel); color: var(--ink); border-color: rgba(0, 0, 0, 0.25); }
+.voice-panel .chip-btn.on { background: var(--gold); color: #fff; border-color: var(--gold); }
+.voice-settings { display: grid; gap: 10px; margin-top: 8px; }
+.voice-settings .toggle.row { display: flex; justify-content: space-between; gap: 8px; }
+.voice-settings select { min-width: 0; flex: 1; max-width: 70%; font-size: 16px; }
+.voice-peers { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.voice-peers li { display: flex; align-items: center; gap: 8px; }
+.voice-peers .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(128, 128, 128, 0.5); flex: none; }
+.voice-dot.speaking { background: #4cd47a; box-shadow: 0 0 0 3px rgba(76, 212, 122, 0.4); }
+.warn-text { color: var(--accent); }

@@ -253,6 +253,38 @@ describe('房間', () => {
   });
 });
 
+describe('語音 signaling', () => {
+  it('只轉送給同房間的其他真人；房外的人收不到，也不能轉給自己', async () => {
+    const a = await client('Rtc1');
+    a.send({ t: 'createRoom', settings: { playerCount: 3 } });
+    const room = await a.waitFor(() => a.room);
+    const b = await client('Rtc2');
+    b.send({ t: 'joinRoom', roomId: room.id });
+    await b.waitFor(() => b.room);
+    const outsider = await client('Rtc3');
+    const data = { k: 'hello' as const, sid: 's1', mic: true };
+    a.send({ t: 'rtc', to: b.userId, data });
+    const got = await b.waitFor(() => b.messages.find((m) => m.t === 'rtc'));
+    expect(got).toEqual({ t: 'rtc', from: a.userId, data });
+    // 房外的人不能傳給房內的人，也收不到房內的訊息
+    outsider.send({ t: 'rtc', to: b.userId, data });
+    a.send({ t: 'rtc', to: outsider.userId, data });
+    a.send({ t: 'rtc', to: a.userId, data });
+    a.send({ t: 'ping' });
+    await a.waitFor(() => a.messages.find((m) => m.t === 'pong'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(b.messages.filter((m) => m.t === 'rtc')).toHaveLength(1);
+    expect(outsider.messages.some((m) => m.t === 'rtc')).toBe(false);
+    expect(a.messages.some((m) => m.t === 'rtc')).toBe(false);
+  });
+
+  it('/ice-servers 提供 ICE 設定', async () => {
+    const r = await fetch(`http://127.0.0.1:${server.port}/ice-servers`);
+    const list = await r.json();
+    expect(Array.isArray(list) && list.length > 0).toBe(true);
+  });
+});
+
 describe('對局', () => {
   it('2 真人 + 2 AI 打完一圈，結算後加一圈', async () => {
     const host = await client('P1');

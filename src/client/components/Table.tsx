@@ -7,6 +7,8 @@ import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
 import { AILevelSelect } from './Inputs.js';
 import { kindLabel, Tile } from './Tile.js';
+import { useVoice } from '../voice.js';
+import { VoiceButtons, VoiceMark, VoiceSettings } from './Voice.js';
 import { YakuTable } from './YakuTable.js';
 
 const WIND = ['東', '南', '西', '北'];
@@ -96,6 +98,7 @@ function NamePlate({ p, room, game, pos }: { p: PlayerView; room: RoomView; game
     <div className={`nameplate at-${pos} ${active ? 'active' : ''}`}>
       <div className="name">
         {p.nickname}
+        <VoiceMark userId={p.userId} />
         {waiting && game.phase !== 'turn' && <span className="thinking">…</span>}
       </div>
       <div className="badges">
@@ -166,6 +169,8 @@ function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
   const [showYaku, setShowYaku] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const voice = useVoice();
   const boxRef = useRef<HTMLDivElement>(null);
   // 打開時點選單以外的地方就關起來
   useEffect(() => {
@@ -196,6 +201,7 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
       {open && (
         <div className="menu-pop" role="menu">
           <button onClick={() => (setShowYaku(true), setOpen(false))}>牌型表</button>
+          {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>語音設定</button>}
           <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
             <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
             只和最高分
@@ -214,6 +220,17 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
           <button className="danger" onClick={() => confirm('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？') && send({ t: 'leaveRoom' })}>
             離開牌局
           </button>
+        </div>
+      )}
+      {showVoice && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowVoice(false)}>
+          <div className="modal voice-modal">
+            <div className="reco-head">
+              <h2>語音設定</h2>
+              <button className="link" onClick={() => setShowVoice(false)} aria-label="關閉">✕</button>
+            </div>
+            <VoiceSettings room={room} />
+          </div>
         </div>
       )}
       {showYaku && (
@@ -358,6 +375,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title="只維持這一局，下一局自動關閉" onClick={() => setAuto({ on: !game.auto.on })}>
         自動摸打
       </button>
+      <VoiceButtons />
       <ToolsMenu room={room} game={game} setAuto={setAuto} />
     </div>
   );
@@ -773,6 +791,7 @@ function StatusBar({ room, game, now }: { room: RoomView; game: GameView; now: n
             <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === me ? 'me' : ''}`}>
               <b>{windLabel(p.wind)}</b>
               <span className="nm">{p.seat === me ? '我' : p.nickname}</span>
+              <VoiceMark userId={p.userId} />
               <span className="pt">{p.score}</span>
             </span>
           );

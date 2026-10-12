@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { PROTOCOL_VERSION, type ClientMessage, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
+import { PROTOCOL_VERSION, type ClientMessage, type RtcSignal, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
 import { signChallenge } from './identity.js';
 
 export interface AppState {
@@ -40,8 +40,12 @@ export function useAppState(): AppState {
   return useSyncExternalStore(
     (l) => (listeners.add(l), () => listeners.delete(l)),
     () => state,
+    () => state,
   );
 }
+
+/** 語音模組註冊：收到同房間玩家的 signaling 時呼叫 */
+export const rtcListeners = new Set<(from: string, data: RtcSignal) => void>();
 
 let ws: WebSocket | null = null;
 let retry = 0;
@@ -91,6 +95,9 @@ export function connect() {
         break;
       case 'error':
         toast(msg.message);
+        break;
+      case 'rtc':
+        rtcListeners.forEach((l) => l(msg.from, msg.data));
         break;
       case 'roomList':
         set({ roomList: msg.rooms });

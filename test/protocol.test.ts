@@ -6,7 +6,7 @@ import { PROTOCOL_VERSION } from '../src/shared/protocol.js';
 // 防止「改了協定卻沒加版本」：舊伺服器配新網頁時，畫面會因為缺欄位而壞掉，
 // 而版本號正是連線時用來偵測這種情況的依據。
 // protocol.ts 有任何變動時這個測試會失敗：請把 PROTOCOL_VERSION 加一，再把下面兩個值更新成錯誤訊息裡的新值。
-const RECORDED = { version: 6, hash: '18a379496d2d44a4' };
+const RECORDED = { version: 7, hash: '5e4bc9754bfb4bd9' };
 
 describe('協定版本', () => {
   it('protocol.ts 變動時必須同時調整 PROTOCOL_VERSION', () => {

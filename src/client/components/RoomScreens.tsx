@@ -4,6 +4,7 @@ import type { RuleSettings } from '../../shared/rules.js';
 import { send, toast } from '../net.js';
 import { AI_LEVEL_LABEL, AILevelSelect } from './Inputs.js';
 import { SettingsForm } from './Lobby.js';
+import { VoicePanel } from './Voice.js';
 
 function rulesSummary(s: RuleSettings) {
   return [
@@ -90,6 +91,7 @@ export function WaitingRoom({ room }: { room: RoomView }) {
           )}
           <button onClick={() => send({ t: 'leaveRoom' })}>離開房間</button>
         </div>
+        <VoicePanel room={room} />
         <p className="muted small">{isHost ? '人數到齊、其他玩家都準備後即可開始。' : '請按「準備」，由房主開始牌局。'}</p>
       </div>
       <div className="panel">
@@ -123,6 +125,7 @@ export function FinalScreen({ room }: { room: RoomView }) {
             </li>
           ))}
         </ol>
+        <VoicePanel room={room} />
         <div className="row">
           {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>加一圈</button>}
           {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>以 AI 補上空位</button>}

@@ -16,6 +16,8 @@ export interface ServerOptions {
   /** 前端靜態檔目錄（存在時才提供） */
   staticDir?: string;
   aiDelayMs?: number;
+  /** 語音用的 ICE servers（STUN／TURN），預設為公用 STUN */
+  iceServers?: { urls: string | string[]; username?: string; credential?: string }[];
   resultMs?: number;
   /** 換三張後亮出收到的牌多久 */
   passRevealMs?: number;
@@ -218,6 +220,15 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         return reply(c, room.extend(userId));
       case 'restart':
         return reply(c, room.restart(userId));
+      case 'rtc': {
+        // 只轉給同房間的其他真人；內容不解讀
+        const to = String(msg.to ?? '');
+        const ids = room.humanUserIds();
+        if (to === userId || !ids.includes(to) || !msg.data || typeof msg.data !== 'object') return;
+        const target = conns.get(to);
+        if (target) send(target.ws, { t: 'rtc', from: userId, data: msg.data });
+        return;
+      }
       default:
         send(c.ws, { t: 'error', code: 'unknown', message: '未知的訊息' });
     }
@@ -230,6 +241,11 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (url.pathname === '/healthz') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true, users: users.size, rooms: rooms.size }));
+      return;
+    }
+    if (url.pathname === '/ice-servers') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' });
+      res.end(JSON.stringify(opts.iceServers ?? [{ urls: 'stun:stun.l.google.com:19302' }]));
       return;
     }
     if (!staticDir) {

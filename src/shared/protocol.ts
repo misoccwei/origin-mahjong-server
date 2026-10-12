@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 // ---- 遊戲行動 ----
 
@@ -166,6 +166,16 @@ export interface RoomSummary {
   scoring: 'additive' | 'zeroSum';
 }
 
+// ---- 語音（WebRTC P2P mesh，伺服器只轉送 signaling）----
+
+export type RtcSignal =
+  /** 通知對方「我在線上、請與我建立連線」；sid 是這個網頁分頁的工作階段，重新整理後會變 */
+  | { k: 'hello'; sid: string; mic: boolean }
+  /** 麥克風開關（顯示用） */
+  | { k: 'status'; sid: string; mic: boolean }
+  | { k: 'offer' | 'answer'; sid: string; sdp: string }
+  | { k: 'ice'; sid: string; candidate: { candidate: string; sdpMid?: string | null; sdpMLineIndex?: number | null } };
+
 // ---- 訊息 ----
 
 export type ClientMessage =
@@ -195,6 +205,8 @@ export type ClientMessage =
   | { t: 'decide'; choice: 'ai' | 'dissolve' }
   | { t: 'extend' }
   | { t: 'restart' }
+  /** 語音 signaling：只會轉給同房間的真人 */
+  | { t: 'rtc'; to: string; data: RtcSignal }
   | { t: 'ping' };
 
 export type ServerMessage =
@@ -205,6 +217,7 @@ export type ServerMessage =
   | { t: 'error'; code: string; message: string }
   | { t: 'kicked'; reason: string }
   | { t: 'roomList'; rooms: RoomSummary[] }
+  | { t: 'rtc'; from: string; data: RtcSignal }
   | { t: 'pong' };
 
 export const AUTH_PREFIX = 'origin-mahjong-auth:';
