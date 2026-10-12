@@ -444,27 +444,70 @@ function SwapMini({ game }: { game: GameView }) {
   );
 }
 
+/** 推薦／牌效率的輸入：自己的手牌與鳴牌，以及看得到的牌（所有人的鳴牌（他人暗槓除外）與還在河裡的捨牌） */
+function recommendInput(room: RoomView, game: GameView) {
+  const me = room.players[room.mySeat!];
+  const visible = new Array(34).fill(0);
+  for (const t of game.myHand) visible[kindOf(t)]++;
+  for (const p of room.players) {
+    for (const m of p.melds) for (const t of m.tiles) if (t >= 0) visible[kindOf(t)]++;
+    for (const d of p.discards) if (!d.called) visible[kindOf(d.tile)]++;
+  }
+  return { concealed: game.myHand.map(kindOf), melds: me.melds, seatWind: me.wind ?? 27, advanced: room.settings.advanced, visible };
+}
+
+/** 直式資訊卡「提示」分頁的補充：現在輪到誰，以及沒聽牌時的牌效率 */
+function HintExtras({ room, game }: { room: RoomView; game: GameView }) {
+  const me = room.mySeat!;
+  const fast = useMemo(() => fastestWin(recommendInput(room, game)), [game.myHand, room.players, room.settings.advanced]);
+  const who = (s: number) => (s === me ? '你' : room.players[s]?.nickname);
+  const status =
+    game.phase === 'passThree'
+      ? '換三張：大家選牌中'
+      : game.phase === 'passReveal'
+        ? '換三張：亮牌中'
+        : game.phase === 'claim' || game.phase === 'chankan'
+          ? game.pending
+            ? '可以鳴牌：吃、碰、槓或和'
+            : `等待 ${game.waitingSeats.map(who).join('、')} 決定是否鳴牌`
+          : game.phase === 'turn'
+            ? game.currentSeat === me
+              ? '輪到你打牌'
+              : `輪到 ${who(game.currentSeat)} 打牌`
+            : '';
+  return (
+    <div className="hint-extras">
+      {status && <div className="hint-status">{status}</div>}
+      {game.myWaits.length === 0 && game.phase !== 'passThree' && game.phase !== 'passReveal' && Number.isFinite(fast.shanten) && (
+        <div className="hint-eff">
+          牌效率：{shantenText(fast.shanten)}・有效牌 {fast.ukeire} 張
+          {fast.discard !== undefined && (
+            <>
+              ，建議打 <Tile kind={fast.discard} small />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const shantenText = (s: number) => (s < 0 ? '已成形' : s === 0 ? '聽牌' : `向聽 ${s}`);
 
-function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameView; mode: 'beside' | 'overlay'; onClose: () => void }) {
+function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameView; mode: 'beside' | 'card'; onClose: () => void }) {
   const me = room.players[room.mySeat!];
   const { recs, fast } = useMemo(() => {
-    // 看得到的牌：自己的手牌、所有人的鳴牌（他人暗槓除外）與還在河裡的捨牌，用來算有效牌還剩幾張
-    const visible = new Array(34).fill(0);
-    for (const t of game.myHand) visible[kindOf(t)]++;
-    for (const p of room.players) {
-      for (const m of p.melds) for (const t of m.tiles) if (t >= 0) visible[kindOf(t)]++;
-      for (const d of p.discards) if (!d.called) visible[kindOf(d.tile)]++;
-    }
-    const input = { concealed: game.myHand.map(kindOf), melds: me.melds, seatWind: me.wind ?? 27, advanced: room.settings.advanced, visible };
+    const input = recommendInput(room, game);
     return { recs: recommendYaku(input), fast: fastestWin(input) };
   }, [game.myHand, room.players, me.melds, me.wind, room.settings.advanced]);
   return (
     <aside className={`reco-panel ${mode}`}>
-      <div className="reco-head">
-        <strong>推薦牌型</strong>
-        <button className="link" onClick={onClose} aria-label="關閉">✕</button>
-      </div>
+      {mode === 'beside' && (
+        <div className="reco-head">
+          <strong>推薦牌型</strong>
+          <button className="link" onClick={onClose} aria-label="關閉">✕</button>
+        </div>
+      )}
       <div className="reco-fast">
         <div className="reco-title">
           <span>最快和牌</span>
@@ -708,6 +751,87 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
+/** 直式上方的狀態列：局數、餘牌、倒數，以及四家的門風、名字與分數（輪到的人亮起） */
+function StatusBar({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
+  const remain = game.deadline && game.phase !== 'result' ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  const me = room.mySeat!;
+  const n = room.players.length;
+  // 從自己開始，依下家、對家、上家的順序
+  const order = Array.from({ length: n }, (_, i) => room.players[(me + i) % n]);
+  return (
+    <header className="status-bar">
+      <div className="status-row">
+        <span className="round">
+          第 {game.handNo} / {game.totalHands} 局・餘 {Math.max(0, game.wallRemaining - game.deadWall)}
+        </span>
+        {remain !== null && <span className={`status-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
+      </div>
+      <div className="score-row">
+        {order.map((p) => {
+          const active = game.currentSeat === p.seat && (game.phase === 'turn' || game.phase === 'claim');
+          return (
+            <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === me ? 'me' : ''}`}>
+              <b>{windLabel(p.wind)}</b>
+              <span className="nm">{p.seat === me ? '我' : p.nickname}</span>
+              <span className="pt">{p.score}</span>
+            </span>
+          );
+        })}
+      </div>
+    </header>
+  );
+}
+
+type InfoTab = 'hint' | 'reco' | 'swap';
+
+/** 直式上方的資訊卡：分頁切換提示（聽牌、打出後聽）、推薦牌型、換三張紀錄；高度隨剩餘空間伸縮 */
+function InfoCard({ room, game, tab, setTab, hint }: { room: RoomView; game: GameView; tab: InfoTab; setTab: (t: InfoTab) => void; hint: ReactElement }) {
+  const hasSwap = !!game.passSent && !!game.passReceived;
+  const current = tab === 'swap' && !hasSwap ? 'hint' : tab;
+  return (
+    <section className="info-card">
+      <div className="info-tabs" role="tablist">
+        <button role="tab" aria-selected={current === 'hint'} className={current === 'hint' ? 'on' : ''} onClick={() => setTab('hint')}>
+          {game.myWaits.length > 0 ? '聽牌' : '提示'}
+        </button>
+        <button role="tab" aria-selected={current === 'reco'} className={current === 'reco' ? 'on' : ''} onClick={() => setTab('reco')}>
+          推薦牌型
+        </button>
+        {hasSwap && (
+          <button role="tab" aria-selected={current === 'swap'} className={current === 'swap' ? 'on' : ''} onClick={() => setTab('swap')}>
+            換三張
+          </button>
+        )}
+      </div>
+      <div className="info-body">
+        {current === 'hint' && (
+          <>
+            <HintExtras room={room} game={game} />
+            {hint}
+          </>
+        )}
+        {current === 'reco' && <RecoPanel room={room} game={game} mode="card" onClose={() => setTab('hint')} />}
+        {current === 'swap' && hasSwap && (
+          <div className="swap-card">
+            <div className="swap-row">
+              <span className="small">換出</span>
+              {game.passSent!.map((t) => (
+                <Tile key={t} tile={t} dim small />
+              ))}
+            </div>
+            <div className="swap-row">
+              <span className="small">收到</span>
+              {game.passReceived!.map((t) => (
+                <Tile key={t} tile={t} small />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /** 橫式（寬大於高）時，手牌在下、牌桌置中、兩側放工具與面板 */
 function useLandscape() {
   const query = '(min-aspect-ratio: 5/4)';
@@ -722,7 +846,15 @@ function useLandscape() {
   return !!landscape;
 }
 
-function Board({ room, game, now, pointKind, overlay }: { room: RoomView; game: GameView; now: number; pointKind: TileKind | null; overlay: ReactElement | null }) {
+function Board({ room, game, now, pointKind, overlay, swapMini = true }: {
+  room: RoomView;
+  game: GameView;
+  now: number;
+  pointKind: TileKind | null;
+  overlay: ReactElement | null;
+  /** 直式時換三張紀錄改放在上方資訊卡，牌桌上不顯示 */
+  swapMini?: boolean;
+}) {
   const me = room.mySeat!;
   const n = room.players.length;
   return (
@@ -730,7 +862,7 @@ function Board({ room, game, now, pointKind, overlay }: { room: RoomView; game: 
       <Center room={room} game={game} now={now} />
       <CallOverlay game={game} />
       {overlay}
-      {game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : game.phase !== 'passThree' && <SwapMini game={game} />}
+      {game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
       {room.players.map((p) => (
         <Side key={p.seat} p={p} game={game} pos={positionOf(p.seat, me, n)} pointKind={pointKind} />
       ))}
@@ -771,9 +903,13 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   setShowReco: (f: (v: boolean) => boolean) => void;
   landscape: boolean;
 }) {
-  const my = useMyArea({ room, game, onPoint: setPointKind, showReco, toggleReco: () => setShowReco((v) => !v), landscape });
-  const board = <Board room={room} game={game} now={now} pointKind={pointKind} overlay={my.boardOverlay} />;
-  const reco = showReco && <RecoPanel room={room} game={game} mode={landscape ? 'beside' : 'overlay'} onClose={() => setShowReco(() => false)} />;
+  // 直式：上方資訊卡的分頁；「推薦牌型」按鈕切到推薦分頁
+  const [tab, setTab] = useState<InfoTab>('hint');
+  const recoOn = landscape ? showReco : tab === 'reco';
+  const toggleReco = () => (landscape ? setShowReco((v) => !v) : setTab((t) => (t === 'reco' ? 'hint' : 'reco')));
+  const my = useMyArea({ room, game, onPoint: setPointKind, showReco: recoOn, toggleReco, landscape });
+  const board = <Board room={room} game={game} now={now} pointKind={pointKind} overlay={my.boardOverlay} swapMini={landscape} />;
+  const reco = landscape && showReco && <RecoPanel room={room} game={game} mode="beside" onClose={() => setShowReco(() => false)} />;
   const modals = (
     <>
       {game.phase === 'result' && game.result && <ResultModal room={room} game={game} now={now} />}
@@ -806,11 +942,9 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   }
   return (
     <div className={`table portrait players-${room.players.length}`}>
-      <div className="stage">
-        {board}
-        {reco}
-      </div>
-      {my.top}
+      <StatusBar room={room} game={game} now={now} />
+      <InfoCard room={room} game={game} tab={tab} setTab={setTab} hint={my.top} />
+      <div className="stage">{board}</div>
       {my.hand}
       {my.tools}
       {modals}

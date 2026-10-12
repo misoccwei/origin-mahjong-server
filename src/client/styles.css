@@ -154,8 +154,49 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   /* 牌桌（正方形）邊長；自訂屬性在使用處才計算，所以 cq 單位以 .stage 為準 */
   --S: min(100cqw, 100cqh);
 }
-/* 直式：多出來的高度留在上方，牌桌貼近手牌（拇指比較好按） */
-.table.portrait .stage { align-items: flex-end; }
+/* 直式：上方狀態列 → 資訊卡（吃掉多出來的高度）→ 正方形牌桌 → 手牌 → 工具列。
+   牌桌先依寬度決定大小，矮的螢幕上牌桌才會縮小，資訊卡最少保留一行 */
+.table.portrait .stage { flex: 0 1 calc(100vw - 16px); min-height: 220px; }
+.status-bar { flex: none; display: grid; gap: 4px; }
+.status-row { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 0.95em; }
+.status-timer { color: var(--gold); font-variant-numeric: tabular-nums; }
+.status-timer.urgent { color: #ff6b5b; }
+.score-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; }
+.score-chip {
+  display: flex; align-items: center; gap: 4px; min-width: 0; padding: 4px 6px; border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3); font-size: 0.85em; border: 1.5px solid transparent;
+}
+.score-chip b { flex: none; }
+.score-chip .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-chip .pt { font-variant-numeric: tabular-nums; font-weight: 700; }
+.score-chip.me { border-color: rgba(255, 255, 255, 0.35); }
+.score-chip.active { background: var(--gold); color: #fff; }
+.info-card {
+  flex: 1 1 0; min-height: 76px; display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(0, 0, 0, 0.22); border-radius: 12px;
+}
+.info-tabs { flex: none; display: flex; gap: 2px; padding: 4px 4px 0; }
+.info-tabs button {
+  padding: 6px 12px; font-size: 0.85em; border-radius: 8px 8px 0 0; border: none; box-shadow: none;
+  background: transparent; color: #cfe0d6;
+}
+.info-tabs button.on, .info-tabs button.on:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.info-tabs button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+.info-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; background: rgba(255, 255, 255, 0.06); border-radius: 0 0 12px 12px; }
+.info-body .my-top { min-height: 0; }
+.reco-panel.card { background: transparent; color: #f4f1e8; box-shadow: none; padding: 0; font-size: 0.9em; }
+.reco-panel.card .muted, .reco-panel.card .small.muted { color: #b7cfc3; }
+.reco-panel.card .reco-fast { background: rgba(0, 0, 0, 0.2); border-color: rgba(255, 255, 255, 0.15); }
+.reco-panel.card li { border-bottom-color: rgba(255, 255, 255, 0.12); }
+.reco-panel.card ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.reco-panel.card .reco-title .pts { color: var(--gold); }
+.swap-card { display: grid; gap: 6px; }
+.hint-extras { display: grid; gap: 6px; margin-bottom: 6px; }
+.hint-status { font-weight: 700; font-size: 1.05em; }
+.hint-eff { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: #dfe9e3; font-size: 0.9em; }
+/* 直式：局數、倒數已在狀態列，中央面板只放剛打出的牌（放大） */
+.table.portrait .center-info .round, .table.portrait .center-info .timer { display: none; }
+.table.portrait .recent { --tw: calc(var(--S) * 0.065); }
 .table.landscape .stage { --gutter-min: clamp(150px, 22cqw, 300px); --S: min(100cqh, calc(100cqw - 2 * var(--gutter-min))); }
 .board {
   position: relative; width: var(--S); height: var(--S); flex: none;
@@ -352,9 +393,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 /* 推薦牌型：牌桌旁（寬螢幕）或操作列下方（窄螢幕），不蓋到牌桌與操作按鈕 */
 .reco-panel { background: var(--panel); color: var(--ink); border-radius: 12px; padding: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); overflow: auto; z-index: 5; }
 .reco-panel.beside { max-height: 100%; }
-/* 直式：疊在牌桌上半部（自己的手牌與按鈕都在牌桌下方，不會被蓋到） */
-.reco-panel.overlay { position: absolute; top: 4px; left: 4px; right: 4px; max-height: 58%; z-index: 8; font-size: 0.9em; }
-.reco-panel.overlay ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
 .reco-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .reco-fast { border: 1px solid #e2dccb; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
 .reco-panel ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -403,6 +442,11 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
   /* 結算：手機上牌小一點，一副手牌盡量一排放得下 */
   .modal { padding: 14px; }
   .modal .tile.small { --tw: min(21px, calc((100vw - 96px) / 15.5)); }
+}
+/* 窄的直式畫面：工具列四顆按鈕擠在同一排，不換行 */
+@media (max-width: 420px) {
+  .table.portrait .my-tools { flex-wrap: nowrap; gap: 6px; }
+  .table.portrait .chip-btn { padding: 6px 10px; font-size: 0.9em; }
 }
 /* 矮的橫式畫面（手機橫放）：提示文字與按鈕縮小一點 */
 @media (max-height: 500px) {

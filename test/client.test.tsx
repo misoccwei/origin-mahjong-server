@@ -117,6 +117,24 @@ describe('牌桌畫面', () => {
     expect(render(room(), game())).not.toContain('長考');
   });
 
+  it('直式：上方狀態列（局數、四家分數，輪到的人亮起）與資訊卡分頁', () => {
+    const html = render(room(), game({ currentSeat: 1, deadline: Date.now() + 9500 }));
+    expect(html).toMatch(/class="status-bar"/);
+    expect(html).toContain('第 <!-- -->1<!-- --> / <!-- -->4<!-- --> 局');
+    expect(html).toMatch(/class="score-chip active "[^>]*><b>南<\/b><span class="nm">電腦 1<\/span>/);
+    expect(html).toMatch(/class="info-card"/);
+    expect(html).toContain('輪到 電腦 1 打牌');
+    // 沒有換三張紀錄時不顯示該分頁；推薦牌型不再疊在牌桌上
+    expect(html).not.toMatch(/role="tab"[^>]*>換三張/);
+    expect(html).not.toContain('reco-panel overlay');
+  });
+
+  it('直式：有換三張紀錄時多一個分頁，牌桌上不再顯示換三張紀錄', () => {
+    const html = render(room(), game({ passSent: HAND.slice(0, 3), passReceived: [t(30), t(31), t(32)] }));
+    expect(html).toMatch(/role="tab"[^>]*>換三張/);
+    expect(html).not.toContain('swap-mini');
+  });
+
   it('牌桌固定佔滿畫面：直式用 portrait 版面（伺服器渲染沒有視窗時）', () => {
     expect(render(room(), game())).toMatch(/class="table portrait players-4"/);
   });
@@ -136,10 +154,7 @@ describe('牌桌畫面', () => {
     expect(render(room(), game({ phase: 'passReveal', deadline: Date.now() + 2500 }))).toContain('這次沒有換到牌');
   });
 
-  it('亮牌結束後，換出與收到的牌持續顯示在牌桌上', () => {
-    const html = render(room(), game({ passSent: HAND.slice(0, 3), passReceived: [t(30), t(31), t(32)] }));
-    expect(html).toContain('swap-mini');
-  });
+
 
   it('剛打出的牌顯示在中央，鳴牌時加上標記', () => {
     const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 1 ? { discards: [{ tile: t(22), called: false }] } : {})) });
