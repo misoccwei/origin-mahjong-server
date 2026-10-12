@@ -24,12 +24,12 @@ function useNow(offset: number) {
 
 type Pos = 'bottom' | 'right' | 'top' | 'left';
 
-/** 相對於自己的位置：0 = 自己、1 = 下家（右）、2 = 對家（上）、3 = 上家（左） */
+/** 相對於自己的位置：0 = 自己、1 = 下家（左）、2 = 對家（上）、3 = 上家（右）；原點麻將為順時針 */
 function positionOf(seat: number, me: number, n: number): Pos {
   const rel = (seat - me + n) % n;
   if (n === 2) return rel === 0 ? 'bottom' : 'top';
-  if (n === 3) return (['bottom', 'right', 'left'] as const)[rel];
-  return (['bottom', 'right', 'top', 'left'] as const)[rel];
+  if (n === 3) return (['bottom', 'left', 'right'] as const)[rel];
+  return (['bottom', 'left', 'top', 'right'] as const)[rel];
 }
 
 function MeldView({ meld, small }: { meld: Meld; small?: boolean }) {

@@ -217,7 +217,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .timer { font-size: 2em; font-weight: 700; color: var(--gold); line-height: 1; }
 .timer.urgent { color: #ff6b5b; }
 
-/* 每一側：以自己在下方的方向排版，再整層旋轉（下家 -90°、對家 180°、上家 90°） */
+/* 每一側：以自己在下方的方向排版，再整層旋轉（左側 90°、對家 180°、右側 -90°） */
 .side { position: absolute; inset: 0; pointer-events: none; }
 .side.pos-right { transform: rotate(-90deg); }
 .side.pos-top { transform: rotate(180deg); }
