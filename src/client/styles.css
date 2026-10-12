@@ -60,6 +60,32 @@ form input { flex: 1; min-width: 0; }
 .handicap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #ddd; }
 .handicap > span { min-width: 80px; font-weight: 600; }
 
+.room-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.room-actions > button { width: 100%; }
+.room-actions .inline-field select { flex: 1; min-width: 0; }
+.lobby > .panel.wide { grid-column: 1 / -1; }
+/* 牌型表 */
+.yaku-table { display: grid; gap: 8px; }
+.yaku-filters { display: grid; gap: 6px; position: sticky; top: 0; background: var(--panel); padding: 4px 0; z-index: 1; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+button.filter { padding: 4px 10px; font-size: 0.85em; border-radius: 999px; box-shadow: none; background: #f4f0e4; }
+button.filter.on, button.filter.on:hover:not(:disabled) { background: var(--felt); color: #fff; border-color: var(--felt); }
+.yaku-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.yaku-list li { border: 1px solid #e2dccb; border-radius: 10px; padding: 8px 10px; background: #fff; display: grid; gap: 4px; }
+.yaku-list li.na { opacity: 0.45; }
+.yaku-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.yaku-id { font-size: 0.75em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.yaku-name { font-weight: 700; }
+.yaku-pts { margin-left: auto; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.yaku-head .tag { font-size: 0.7em; padding: 1px 6px; border-radius: 999px; color: #fff; }
+.tag.adv { background: #5a6bb0; }
+.tag.exp { background: #b8461b; }
+.yaku-desc { font-size: 0.88em; color: #444; }
+.yaku-example { --tw: 20px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0; }
+.yaku-example .ex-meld { display: inline-flex; margin-left: 6px; }
+.yaku-example .ex-win { display: inline-flex; align-items: flex-end; gap: 2px; margin-left: 8px; }
+.lobby .yaku-table .yaku-list { max-height: none; }
+.modal.yaku-modal { max-width: 960px; }
 .room-list { margin-top: 16px; }
 .room-list h3 { font-size: 1em; margin: 0 0 8px; }
 .room-list ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -68,7 +94,7 @@ form input { flex: 1; min-width: 0; }
 .room-list .room-host { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-code { font-family: ui-monospace, monospace; letter-spacing: 0.15em; background: #efeadb; padding: 2px 10px; border-radius: 6px; }
 .seats { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 6px; }
-.seats li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #f2efe5; }
+.seats li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #f2efe5; min-height: 46px; box-sizing: border-box; }
 .seats li.empty { background: transparent; border: 1px dashed #c9c4b5; }
 .seat-no { width: 24px; height: 24px; border-radius: 50%; background: var(--felt); color: #fff; display: grid; place-items: center; font-size: 0.8em; }
 .seats .name { flex: 1; }
@@ -214,6 +240,10 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .gutter.left { left: 0; }
 .gutter.right { right: 0; overflow: auto; }
 .gutter .my-tools { margin-top: auto; }
+/* 橫式：鳴牌放在右側欄下方，用較大的牌 */
+.side-melds { margin-top: auto; display: grid; gap: 4px; justify-items: start; }
+.side-melds .meld-area { --tw: clamp(22px, calc(var(--S) * 0.05), 44px); justify-content: flex-start; }
+.wait-score { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.3); color: var(--gold); font-weight: 700; white-space: nowrap; }
 .tile-slot { position: relative; display: inline-flex; }
 /* 外框固定不動，往上多留一點點擊範圍（選中的牌浮起來後仍點得到） */
 .tile-slot.clickable { cursor: pointer; padding-top: calc(var(--tw) * 0.35); margin-top: calc(var(--tw) * -0.35); }

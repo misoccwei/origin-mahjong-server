@@ -618,6 +618,7 @@ export class Room {
       passSent: hand.passSent[seat],
       passReceived: hand.passReceived[seat],
       myWaits: hand.waitsFor(seat),
+      myWaitScore: hand.waitScore(seat),
       auto: { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true },
       thinkAvailable:
         !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,

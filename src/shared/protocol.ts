@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 // ---- 遊戲行動 ----
 
@@ -126,6 +126,8 @@ export interface GameView {
   passReceived: TileId[] | null;
   /** 自己聽牌時所聽的牌與剩餘張數（只計自己看得到的牌） */
   myWaits: { kind: TileKind; left: number }[];
+  /** 聽牌時預計的和牌分數範圍（不含偶然類）；聽牌但都未達和牌最低分數時為 null */
+  myWaitScore: { min: number; max: number } | null;
   /** 這一局還能按「長考」延長打牌時限（每局一次） */
   thinkAvailable: boolean;
   /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者下一局都會自動關閉） */

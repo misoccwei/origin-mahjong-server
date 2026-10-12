@@ -10,6 +10,7 @@ function rulesSummary(s: RuleSettings) {
     `${s.playerCount} 人`,
     `${s.rounds} 圈（${s.rounds * s.playerCount} 局）`,
     s.advanced ? '進階規則' : '基本規則',
+    s.expansion && '牌型擴充包',
     s.scoring === 'zeroSum' ? '零和式' : '加分式',
     s.minWinScore > 0 && `最低 ${s.minWinScore} 分`,
     `電腦${AI_LEVEL_LABEL[s.aiLevel]}`,
@@ -69,10 +70,13 @@ export function WaitingRoom({ room }: { room: RoomView }) {
             </li>
           ))}
         </ul>
-        <div className="row">
-          {isHost && !full && <button onClick={() => send({ t: 'addAI' })}>加入 AI</button>}
+        {/* 固定兩欄的格子：某顆按鈕停用時位置不變，其他按鈕不會跟著移動 */}
+        <div className="room-actions">
+          <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? '座位已滿' : undefined}>
+            加入 AI
+          </button>
           <label className="inline-field">
-            電腦難度
+            電腦
             <AILevelSelect value={room.settings.aiLevel} disabled={!isHost} onChange={(level) => send({ t: 'setAILevel', level })} />
           </label>
           {isHost ? (

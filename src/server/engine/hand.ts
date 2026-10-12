@@ -329,7 +329,7 @@ export class Hand {
       if (tried.has(hand[i])) continue;
       tried.add(hand[i]);
       const rest = [...hand.slice(0, i), ...hand.slice(i + 1)];
-      const w = waitingKinds(rest, this.melds[seat], this.settings.advanced);
+      const w = waitingKinds(rest, this.melds[seat], this.settings.advanced, this.settings.expansion);
       if (w.length) hints[hand[i]] = w;
     }
     return hints;
@@ -342,13 +342,50 @@ export class Hand {
   waitsFor(seat: number): { kind: TileKind; left: number }[] {
     if (this.phase === 'passThree' || this.phase === 'passReveal' || this.phase === 'ended') return [];
     const kinds = this.hands[seat].map(kindOf);
-    const waits = waitingKinds(kinds, this.melds[seat], this.settings.advanced);
+    const waits = waitingKinds(kinds, this.melds[seat], this.settings.advanced, this.settings.expansion);
     if (!waits.length) return [];
     const seen = countOf(this.hands[seat]);
     const see = (t: TileId) => seen.set(kindOf(t), (seen.get(kindOf(t)) ?? 0) + 1);
     this.discards.forEach((ds) => ds.forEach((d) => !d.called && see(d.tile)));
     this.melds.forEach((ms, i) => ms.forEach((m) => (m.type !== 'ankan' || i === seat) && m.tiles.forEach(see)));
     return waits.map((kind) => ({ kind, left: Math.max(0, 4 - (seen.get(kind) ?? 0)) }));
+  }
+
+  /**
+   * 聽牌時預計的和牌分數範圍：所有聽的牌 × 自摸／銃和，取最低與最高（不含偶然類）。
+   * 未達和牌最低分數（或小牌限制）而不能和的情況不列入；全部都不能和時回傳 null。
+   */
+  waitScore(seat: number): { min: number; max: number } | null {
+    if (this.phase === 'passThree' || this.phase === 'passReveal' || this.phase === 'ended') return null;
+    const kinds = this.hands[seat].map(kindOf);
+    const waits = waitingKinds(kinds, this.melds[seat], this.settings.advanced, this.settings.expansion);
+    let min = Infinity;
+    let max = -Infinity;
+    for (const w of waits) {
+      for (const tsumo of [true, false]) {
+        const s = evaluateWin({
+          concealed: [...kinds, w],
+          melds: this.melds[seat],
+          winTile: w,
+          tsumo,
+          seatWind: this.seatWind(seat),
+          advanced: this.settings.advanced,
+          expansion: this.settings.expansion,
+          baseScore: baseScoreFor(this.settings, seat),
+        });
+        if (!s || !this.allowedScore(seat, s)) continue;
+        min = Math.min(min, s.total);
+        max = Math.max(max, s.total);
+      }
+    }
+    return Number.isFinite(min) ? { min, max } : null;
+  }
+
+  /** 和牌最低分數與小牌限制 */
+  private allowedScore(seat: number, score: HandScore): boolean {
+    if (score.total < this.settings.minWinScore) return false;
+    if (this.settings.smallHandLimit && score.total < 20 && !this.smallHandAvailable[seat] && !this.settings.handicaps[seat]?.exemptSmallHand) return false;
+    return true;
   }
 
   /** 自動模式用：目前可和的分數，以及這副聽牌可能的最高分（不含偶然類） */
@@ -369,7 +406,7 @@ export class Hand {
       waiting = this.hands[seat];
     } else return null;
     if (!score) return null;
-    const best = bestTenpaiScore(waiting.map(kindOf), this.melds[seat], this.seatWind(seat), this.settings.advanced, baseScoreFor(this.settings, seat));
+    const best = bestTenpaiScore(waiting.map(kindOf), this.melds[seat], this.seatWind(seat), this.settings.advanced, baseScoreFor(this.settings, seat), this.settings.expansion);
     return { score, best: best?.score.total ?? score.total };
   }
 
@@ -383,7 +420,7 @@ export class Hand {
 
   private evaluate(seat: number, concealed: TileId[], winTile: TileId, tsumo: boolean, flags: WinFlags): HandScore | null {
     const kinds = concealed.map(kindOf);
-    if (!isWinningShape(kinds, this.melds[seat].length, this.settings.advanced)) return null;
+    if (!isWinningShape(kinds, this.melds[seat].length, this.settings.advanced, this.settings.expansion)) return null;
     const score = evaluateWin({
       concealed: kinds,
       melds: this.melds[seat],
@@ -391,17 +428,13 @@ export class Hand {
       tsumo,
       seatWind: this.seatWind(seat),
       advanced: this.settings.advanced,
+      expansion: this.settings.expansion,
       baseScore: baseScoreFor(this.settings, seat),
       flags,
     });
     if (!score) return null;
-    // 和牌最低分數
-    if (score.total < this.settings.minWinScore) return null;
-    // 小牌限制
-    if (this.settings.smallHandLimit && score.total < 20 && !this.smallHandAvailable[seat] && !this.settings.handicaps[seat]?.exemptSmallHand) {
-      return null;
-    }
-    return score;
+    // 和牌最低分數、小牌限制
+    return this.allowedScore(seat, score) ? score : null;
   }
 
   private evaluateTsumo(seat: number): HandScore | null {
@@ -572,7 +605,7 @@ export class Hand {
     for (let s = 0; s < this.n; s++) {
       if (winnerSeats.has(s)) continue;
       const kinds = this.hands[s].map(kindOf);
-      const r = bestTenpaiScore(kinds, this.melds[s], this.seatWind(s), this.settings.advanced, baseScoreFor(this.settings, s));
+      const r = bestTenpaiScore(kinds, this.melds[s], this.seatWind(s), this.settings.advanced, baseScoreFor(this.settings, s), this.settings.expansion);
       if (r) tenpai.push({ seat: s, maxScore: r.score.total, waits: r.waits, best: { tile: r.tile, tsumo: r.tsumo, score: r.score } });
     }
     const useTenpai = this.settings.scoring === 'additive' && this.settings.advanced;

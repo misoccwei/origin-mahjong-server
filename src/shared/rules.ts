@@ -32,6 +32,8 @@ export interface RuleSettings {
   rounds: number;
   /** 進階規則（和牌×2＋聽牌得分、進階牌型） */
   advanced: boolean;
+  /** 牌型擴充包（規則書補頁）：二元／二風、連面子、鏡面子、四歸一、十三不搭、對稱類等 20 個牌型 */
+  expansion: boolean;
   /** 和牌最低分數：和牌分數（底分＋牌型分數）未達此分數時不能和牌，0 = 不限 */
   minWinScore: number;
   /** 電腦難度（AI 座位與 AI 代打共用） */
@@ -57,6 +59,7 @@ export function defaultSettings(playerCount: 2 | 3 | 4 = 4): RuleSettings {
     rounds: DEFAULT_ROUNDS[playerCount],
     advanced: true,
     minWinScore: 20,
+    expansion: false,
     aiLevel: 'easy',
     passThree: true,
     scoring: 'additive',
@@ -103,6 +106,7 @@ export function sanitizeSettings(input: Partial<RuleSettings> | undefined, prev?
     rounds: int(input?.rounds, 1, 16, base.rounds),
     advanced,
     minWinScore: int(input?.minWinScore, 0, 320, base.minWinScore),
+    expansion: input?.expansion !== undefined ? !!input.expansion : base.expansion,
     aiLevel: (['beginner', 'easy', 'normal', 'hard'] as const).find((l) => l === input?.aiLevel) ?? base.aiLevel,
     passThree: input?.passThree !== undefined ? !!input.passThree : base.passThree,
     scoring: input?.scoring === 'zeroSum' || input?.scoring === 'additive' ? input.scoring : base.scoring,

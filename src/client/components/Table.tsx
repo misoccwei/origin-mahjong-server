@@ -7,6 +7,7 @@ import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
 import { AILevelSelect } from './Inputs.js';
 import { kindLabel, Tile } from './Tile.js';
+import { YakuTable } from './YakuTable.js';
 
 const WIND = ['東', '南', '西', '北'];
 const windLabel = (k: TileKind | null) => (k === null ? '' : WIND[k - 27]);
@@ -143,7 +144,7 @@ function CallOverlay({ game }: { game: GameView }) {
   return <div className="call-overlay">{buttons}</div>;
 }
 
-function Waits({ waits }: { waits: GameView['myWaits'] }) {
+function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['myWaitScore'] | undefined }) {
   return (
     <>
       聽牌：
@@ -153,6 +154,10 @@ function Waits({ waits }: { waits: GameView['myWaits'] }) {
           <span className="left">×{w.left}</span>
         </span>
       ))}
+      {/* 預計和牌分數（所有聽的牌、自摸或銃和；不含偶然類），最高與最低相同時只寫一個 */}
+      <span className="wait-score">
+        {score ? (score.min === score.max ? `預計 ${score.max} 分` : `預計 ${score.min}～${score.max} 分`) : '未達和牌最低分數，不能和'}
+      </span>
     </>
   );
 }
@@ -160,6 +165,7 @@ function Waits({ waits }: { waits: GameView['myWaits'] }) {
 /** ⚙ 選單：較少用的設定（只和最高分、電腦難度、全螢幕、離開），收起來讓工具列在手機上一排放得下 */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
+  const [showYaku, setShowYaku] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   // 打開時點選單以外的地方就關起來
   useEffect(() => {
@@ -189,6 +195,7 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
       </button>
       {open && (
         <div className="menu-pop" role="menu">
+          <button onClick={() => (setShowYaku(true), setOpen(false))}>牌型表</button>
           <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
             <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
             只和最高分
@@ -207,6 +214,17 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
           <button className="danger" onClick={() => confirm('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？') && send({ t: 'leaveRoom' })}>
             離開牌局
           </button>
+        </div>
+      )}
+      {showYaku && (
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowYaku(false)}>
+          <div className="modal yaku-modal">
+            <div className="reco-head">
+              <h2>牌型表</h2>
+              <button className="link" onClick={() => setShowYaku(false)} aria-label="關閉">✕</button>
+            </div>
+            <YakuTable advanced={room.settings.advanced} expansion={room.settings.expansion} defaultShowAll={false} />
+          </div>
         </div>
       )}
     </div>
@@ -287,7 +305,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         ) : game.phase === 'passReveal' ? (
           game.passReceived ? '收到換來的 3 張牌，倒數結束後放進手牌' : '這次沒有換到牌'
         ) : game.myWaits.length > 0 ? (
-          <Waits waits={game.myWaits} />
+          <Waits waits={game.myWaits} score={game.myWaitScore} />
         ) : p?.kind === 'turn' ? (
           '點選一張牌，再按「打出」或再點一次'
         ) : passing ? (
@@ -305,8 +323,16 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   );
 
   // 牌的大小只依「鳴牌組數」決定（手牌 13 − 3×組數，加上摸牌的位置），摸牌時不會變大小或換行
-  const meldTiles = me.melds.reduce((a, m) => a + m.tiles.length + 0.4, 0);
-  const n = 13 - 3 * me.melds.length + 1.5 + (landscape ? meldTiles * 0.8 : 0);
+  // 橫式時鳴牌放到右側欄，下方這排只放手牌
+  const n = 13 - 3 * me.melds.length + 1.5;
+  const meldsEl =
+    me.melds.length > 0 ? (
+      <div className="meld-area">
+        {me.melds.map((m, i) => (
+          <MeldView key={i} meld={m} />
+        ))}
+      </div>
+    ) : null;
   const handEl = (
     <div className="my-hand" style={{ '--n': n } as CSSProperties}>
       <div className="hand-tiles">
@@ -314,13 +340,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         {/* 摸牌的位置一直保留（沒有摸牌時是空位），手牌不會因為摸牌而移動 */}
         <span className="drawn-gap">{game.myDrawn !== null ? tileSlot(game.myDrawn) : <span className="tile-slot placeholder" aria-hidden="true" />}</span>
       </div>
-      {me.melds.length > 0 && (
-        <div className="meld-area">
-          {me.melds.map((m, i) => (
-            <MeldView key={i} meld={m} />
-          ))}
-        </div>
-      )}
+      {!landscape && meldsEl}
     </div>
   );
 
@@ -367,7 +387,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
     </div>
   ) : null;
 
-  return { top, hand: handEl, tools, boardOverlay };
+  return { top, hand: handEl, tools, boardOverlay, melds: meldsEl };
 }
 
 /** 換三張亮牌：蓋在牌桌正中間，收到的牌翻開；沒有交換時也顯示，避免看出誰沒換 */
@@ -529,7 +549,7 @@ function HandRow({ hand, melds, extra }: { hand: TileId[]; melds: Meld[]; extra?
 }
 
 /** 牌型明細：一個牌型一顆小標籤，最後是合計（比表格省高度） */
-function YakuTable({ score, totalLabel }: { score: HandScore; totalLabel: string }) {
+function YakuChips({ score, totalLabel }: { score: HandScore; totalLabel: string }) {
   return (
     <div className="yaku-chips">
       {score.baseScore > 0 && (
@@ -586,7 +606,7 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
                   <Delta d={d} />
                 </header>
                 <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} extra={{ tile: w.tile }} />
-                <YakuTable score={w.score} totalLabel="和牌分數" />
+                <YakuChips score={w.score} totalLabel="和牌分數" />
               </section>
             );
           }
@@ -609,7 +629,7 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
                   最高分的和法：{t.best.tsumo ? '自摸' : '銃和'}「{kindLabel(t.best.tile)}」（聽牌得分依此計算）
                 </div>
                 <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: t.best.tile }} />
-                <YakuTable score={t.best.score} totalLabel="最高和牌分數" />
+                <YakuChips score={t.best.score} totalLabel="最高和牌分數" />
                 {capped && <div className="small muted">聽牌得分不超過和牌者的和牌分數，實得 {d} 分</div>}
               </section>
             );
@@ -769,7 +789,15 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
             {my.tools}
           </div>
           {board}
-          <div className="gutter right">{reco}</div>
+          <div className="gutter right">
+            {reco}
+            {my.melds && (
+              <div className="side-melds">
+                <div className="small muted">鳴牌</div>
+                {my.melds}
+              </div>
+            )}
+          </div>
         </div>
         {my.hand}
         {modals}

@@ -416,4 +416,16 @@ describe('情境', () => {
     expect(autoAction(h, 1, { ...winOnly, onlyMax: true })).toBeNull();
     expect(autoAction(h, 1, { play: false, win: false, onlyMax: false })).toBeNull();
   });
+
+  it('聽牌預計得分：所有聽的牌 × 自摸／銃和的最低與最高；未達和牌最低分數的不列入', () => {
+    // 座位 1：234m 678m 456s 33p 55p 對碰。銃和 10 分（明刻），自摸 15 分（多一暗刻）
+    const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
+    const mk = (minWinScore: number) => makeHand(hands, '🀀', { minWinScore });
+    expect(mk(0).waitScore(1)).toEqual({ min: 10, max: 15 });
+    expect(mk(12).waitScore(1)).toEqual({ min: 15, max: 15 });
+    expect(mk(20).waitScore(1)).toBeNull();
+    // 座位 2 也聽牌（一氣通貫）；座位 0 正在打牌（手上 14 張）時不計算
+    expect(mk(0).waitScore(2)).toEqual({ min: 55, max: 55 });
+    expect(mk(0).waitScore(0)).toBeNull();
+  });
 });

@@ -90,6 +90,36 @@ export function isThirteenOrphans(counts: number[]): boolean {
   return total === 14 && YAOCHU_KINDS.every((k) => counts[k] >= 1);
 }
 
+/**
+ * 十三不搭（牌型擴充包）：十三種牌、其中一種成對；沒有面子也沒有搭子
+ * （同花色數牌的數字至少差 3），數牌的數字彼此不同且為連續 9 種（1〜9）或連續 6 種。
+ */
+export function isThirteenUnrelated(counts: number[]): boolean {
+  let total = 0;
+  let pairs = 0;
+  const digits: number[] = [];
+  for (let k = 0; k < KIND_COUNT; k++) {
+    const n = counts[k];
+    total += n;
+    if (n > 2) return false;
+    if (n === 2) pairs++;
+    if (n && k < 27) digits.push((k % 9) + 1);
+  }
+  if (total !== 14 || pairs !== 1) return false;
+  for (let s = 0; s < 3; s++) {
+    let last = -9;
+    for (let i = 0; i < 9; i++) {
+      if (!counts[s * 9 + i]) continue;
+      if (i - last < 3) return false; // 相鄰或隔一張：成為搭子
+      last = i;
+    }
+  }
+  const sorted = [...digits].sort((a, b) => a - b);
+  if (new Set(sorted).size !== sorted.length) return false;
+  if (sorted.length !== 9 && sorted.length !== 6) return false;
+  return sorted[sorted.length - 1] - sorted[0] === sorted.length - 1;
+}
+
 function meldToGroup(m: Meld): Group {
   const k = kindOf(m.tiles[0]);
   if (m.type === 'chi') {
@@ -109,26 +139,37 @@ export interface YakuDef {
   /** 同系列只取最高分 */
   series: string;
   category: number;
+  /** 進階規則才有的牌型 */
   advanced?: boolean;
+  /** 牌型擴充包的牌型 */
+  expansion?: boolean;
+  /** 每組加計（分數為每組的分數） */
+  perGroup?: boolean;
 }
 
 export const YAKU: Record<string, YakuDef> = {};
-function def(id: string, name: string, points: number, advanced = false) {
+function def(id: string, name: string, points: number, opts: boolean | { advanced?: boolean; expansion?: boolean; perGroup?: boolean } = false) {
   const parts = id.split('.');
-  YAKU[id] = { id, name, points, series: parts.slice(0, 2).join('.'), category: Number(parts[0]), advanced };
+  const o = typeof opts === 'boolean' ? { advanced: opts } : opts;
+  YAKU[id] = { id, name, points, series: parts.slice(0, 2).join('.'), category: Number(parts[0]), ...o };
 }
+
+export const CATEGORY_NAMES: Record<number, string> = {
+  1: '鳴牌類', 2: '么九類', 3: '花色類', 4: '刻槓類', 5: '字牌類', 6: '偶然類',
+  7: '數字類', 8: '連續類', 9: '三色類', 10: '重複類', 11: '特殊類', 13: '對稱類',
+};
 // 1. 鳴牌類
 def('1.0', '不求人', 5);
 def('1.1', '全求人', 10);
 // 2. 么九類
 def('2.0', '斷么九', 5);
 def('2.1', '全帶么九', 40);
-def('2.2.1', '二對清么', 10);
-def('2.2.2', '三對清么', 20);
-def('2.2.3', '四對清么', 40);
-def('2.2.4', '五對清么', 80);
-def('2.2.5', '六對清么', 160);
-def('2.2.6', '七對清么', 320);
+def('2.2.1', '四清么', 10);
+def('2.2.2', '六清么', 20);
+def('2.2.3', '八清么', 40);
+def('2.2.4', '十清么', 80);
+def('2.2.5', '十二清么', 160);
+def('2.2.6', '十四清么', 320);
 // 3. 花色類
 def('3.0', '五門齊', 20);
 def('3.1.1', '缺一色', 5);
@@ -147,7 +188,7 @@ def('4.3.2', '二槓子', 20);
 def('4.3.3', '三槓子', 80);
 def('4.3.4', '四槓子', 320);
 // 5. 字牌類
-def('5.1', '番牌', 10);
+def('5.1', '番牌', 10, { perGroup: true });
 def('5.2.1', '小三元', 40);
 def('5.2.2', '大三元', 160);
 def('5.3.1', '小三風', 40);
@@ -184,6 +225,28 @@ def('10.1.4', '四同順', 320, true);
 // 11. 特殊類
 def('11.1', '七對子', 40, true);
 def('11.2', '十三么九', 160, true);
+// 牌型擴充包（規則書補頁草稿）。系列以編號前兩段判斷：例如小二元 5.2.0.1 與小三元 5.2.1 同一系列
+const EXP = { expansion: true };
+def('5.2.0.1', '小二元', 5, EXP);
+def('5.2.0.2', '大二元', 10, EXP);
+def('5.3.0.1', '小二風', 5, EXP);
+def('5.3.0.2', '大二風', 10, EXP);
+def('8.4.1', '連面子', 5, { expansion: true, perGroup: true });
+def('8.4.2', '二龍戲', 40, EXP);
+def('8.5.1', '三連環', 20, EXP);
+def('8.5.2', '四連環', 80, EXP);
+def('8.6.1', '三連跳', 40, EXP);
+def('8.6.2', '四連跳', 160, EXP);
+def('9.5.1', '鏡面子', 5, { expansion: true, perGroup: true });
+def('9.5.2', '鏡同和', 40, EXP);
+def('9.6', '三色連環', 10, EXP);
+def('9.7', '三色連跳', 20, EXP);
+def('10.2.1', '四歸一', 5, EXP);
+def('10.2.2', '八歸一', 40, EXP);
+def('10.2.3', '十二歸一', 320, EXP);
+def('11.3', '十三不搭', 40, EXP);
+def('13.1', '線對稱', 40, EXP);
+def('13.2', '點對稱', 40, EXP);
 
 export const LIMIT = 160; // 滿貫
 
@@ -214,9 +277,11 @@ export interface WinInput {
   advanced: boolean;
   baseScore: number;
   flags?: WinFlags;
+  /** 牌型擴充包 */
+  expansion?: boolean;
 }
 
-export type WinForm = 'standard' | 'sevenPairs' | 'thirteenOrphans';
+export type WinForm = 'standard' | 'sevenPairs' | 'thirteenOrphans' | 'thirteenUnrelated';
 
 export interface HandScore {
   form: WinForm;
@@ -301,6 +366,14 @@ function tileYaku(all: TileKind[], input: WinInput, hits: YakuHit[]) {
       if (c[s] >= 3 && c[s + 8] >= 3 && [1, 2, 3, 4, 5, 6, 7].every((i) => c[s + i] >= 1)) hits.push(hit('8.3'));
     }
   }
+  // 10.2 四歸一系列（擴充）：不是槓子的同種四張
+  if (input.expansion) {
+    const nonKan = countKinds([...input.concealed, ...input.melds.filter((m) => !isKanMeld(m)).flatMap((m) => m.tiles.map(kindOf))]);
+    const fours = nonKan.filter((n) => n === 4).length;
+    if (fours >= 3) hits.push(hit('10.2.3'));
+    else if (fours === 2) hits.push(hit('10.2.2'));
+    else if (fours === 1) hits.push(hit('10.2.1'));
+  }
   // 6. 偶然類
   const f = input.flags ?? {};
   if (f.chankan) hits.push(hit('6.1.1'));
@@ -350,6 +423,14 @@ function groupYaku(groups: Group[], input: WinInput, hits: YakuHit[]) {
   else if (windTris === 3 && windPair) hits.push(hit('5.3.3'));
   else if (windTris === 3) hits.push(hit('5.3.2'));
   else if (windTris === 2 && windPair) hits.push(hit('5.3.1'));
+  if (input.expansion) {
+    // 二元、二風：與三元、風牌同系列，只取最高分
+    if (dragonTris >= 2) hits.push(hit('5.2.0.2'));
+    if (dragonTris >= 1 && isDragon(pair.kind)) hits.push(hit('5.2.0.1'));
+    if (windTris >= 2) hits.push(hit('5.3.0.2'));
+    if (windTris >= 1 && windPair) hits.push(hit('5.3.0.1'));
+    expansionGroupYaku(groups, input, hits);
+  }
 
   if (!input.advanced) return;
 
@@ -391,6 +472,133 @@ function groupYaku(groups: Group[], input: WinInput, hits: YakuHit[]) {
   else if (mult[0] === 3) hits.push(hit('10.1.3'));
   else if (mult[0] === 2 && mult[1] === 2) hits.push(hit('10.1.2'));
   else if (mult[0] === 2) hits.push(hit('10.1.1'));
+}
+
+/** 由小到大配對（每組只用一次）：a 與 a + step 配成一對；同花色的鏈狀關係用貪婪法即為最多對數 */
+function countChainPairs(kinds: TileKind[], step: number): number {
+  const c = new Map<TileKind, number>();
+  for (const k of kinds) c.set(k, (c.get(k) ?? 0) + 1);
+  let pairs = 0;
+  for (const k of [...c.keys()].sort((a, b) => a - b)) {
+    const n = k % 9 + step <= 8 ? Math.min(c.get(k) ?? 0, c.get(k + step) ?? 0) : 0;
+    if (n > 0) {
+      pairs += n;
+      c.set(k, (c.get(k) ?? 0) - n);
+      c.set(k + step, (c.get(k + step) ?? 0) - n);
+    }
+  }
+  return pairs;
+}
+
+/** 花色相異、數字相同的配對數：同一數字的面子依花色配對（同花色不能互配） */
+function countMirrorPairs(kinds: TileKind[]): number {
+  let pairs = 0;
+  for (let n = 0; n < 9; n++) {
+    const suits = kinds.filter((k) => k % 9 === n).map(suitOf);
+    if (suits.length < 2) continue;
+    const maxSame = Math.max(...[0, 1, 2].map((s) => suits.filter((x) => x === s).length));
+    pairs += Math.min(Math.floor(suits.length / 2), suits.length - maxSame);
+  }
+  return pairs;
+}
+
+/** 同花色、數字成等差（公差 d）的最長鏈長度 */
+function longestArithmetic(kinds: TileKind[], d: number): number {
+  const set = new Set(kinds);
+  let best = 0;
+  for (const k of set) {
+    let len = 1;
+    while (set.has(k + len * d) && suitOf(k + len * d) === suitOf(k) && (k % 9) + len * d <= 8) len++;
+    best = Math.max(best, len);
+  }
+  return best;
+}
+
+/** 牌型擴充包中與面子拆法有關的牌型（連續類、三色類、對稱類） */
+function expansionGroupYaku(groups: Group[], input: WinInput, hits: YakuHit[]) {
+  const sets = groups.filter((g) => g.type !== 'pair');
+  const pair = groups.find((g) => g.type === 'pair')!;
+  let seqs = sets.filter((g) => g.type === 'seq').map((g) => g.kind);
+  let numTris = sets.filter((g) => g.type === 'tri' && !isHonor(g.kind)).map((g) => g.kind);
+  const allSeqs = [...seqs];
+  const allTris = [...numTris];
+  const remove = (arr: TileKind[], k: TileKind) => {
+    const i = arr.indexOf(k);
+    if (i >= 0) arr.splice(i, 1);
+  };
+
+  // 8.4 連面子／二龍戲：已計一氣通貫、三連刻（進階）的面子不再拆出連面子
+  if (input.advanced) {
+    for (let s = 0; s < 3; s++) {
+      if ([0, 3, 6].every((o) => seqs.includes(s * 9 + o))) for (const o of [0, 3, 6]) remove(seqs, s * 9 + o);
+    }
+    const run = [...new Set(numTris)].sort((a, b) => a - b);
+    for (let i = 0; i < run.length; i++) {
+      let len = 1;
+      while (run[i + len] === run[i] + len && suitOf(run[i + len]) === suitOf(run[i])) len++;
+      if (len >= 3) for (let j = 0; j < len; j++) remove(numTris, run[i] + j);
+    }
+  }
+  const seqPairs = countChainPairs(seqs, 3);
+  const triPairs = countChainPairs(numTris, 1);
+  if (seqPairs >= 2 || triPairs >= 2) hits.push(hit('8.4.2'));
+  if (seqPairs + triPairs > 0) hits.push(hit('8.4.1', seqPairs + triPairs));
+  // 8.5 三連環／四連環：同花色、起始數字各差一或各差二的順子
+  const ring = Math.max(longestArithmetic(allSeqs, 1), longestArithmetic(allSeqs, 2));
+  if (ring >= 4) hits.push(hit('8.5.2'));
+  else if (ring === 3) hits.push(hit('8.5.1'));
+  // 8.6 三連跳／四連跳：同花色、數字各差二到四的刻子（四連跳限各差二）
+  if (longestArithmetic(allTris, 2) >= 4) hits.push(hit('8.6.2'));
+  else if ([2, 3, 4].some((d) => longestArithmetic(allTris, d) >= 3)) hits.push(hit('8.6.1'));
+
+  // 9.5 鏡面子／鏡同和：已計三色同順、三色同刻（進階）的那三組不再拆出鏡面子
+  seqs = [...allSeqs];
+  numTris = [...allTris];
+  if (input.advanced) {
+    for (let n = 0; n < 7; n++) if ([0, 1, 2].every((s) => seqs.includes(s * 9 + n))) for (const s of [0, 1, 2]) remove(seqs, s * 9 + n);
+    for (let n = 0; n < 9; n++) if ([0, 1, 2].every((s) => numTris.includes(s * 9 + n))) for (const s of [0, 1, 2]) remove(numTris, s * 9 + n);
+  }
+  const mirrors = countMirrorPairs(seqs) + countMirrorPairs(numTris);
+  const all = allTilesOf(input);
+  const twoSuitsOnly = !all.some(isHonor) && new Set(all.map(suitOf)).size === 2;
+  if (twoSuitsOnly && mirrors >= 2) hits.push(hit('9.5.2'));
+  if (mirrors > 0) hits.push(hit('9.5.1', mirrors));
+  // 9.6 三色連環、9.7 三色連跳（花色相異、公差一致）
+  const has3 = (items: TileKind[], nums: number[]) =>
+    [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]].some((p) => nums.every((n, i) => items.includes(p[i] * 9 + n - 1)));
+  if ([1, 2].some((d) => [1, 2, 3, 4, 5, 6, 7].some((n) => n + 2 * d <= 7 && has3(allSeqs, [n, n + d, n + 2 * d])))) hits.push(hit('9.6'));
+  if ([2, 3, 4].some((d) => [1, 2, 3, 4, 5, 6, 7, 8, 9].some((n) => n + 2 * d <= 9 && has3(allTris, [n, n + d, n + 2 * d])))) hits.push(hit('9.7'));
+
+  // 13. 對稱類：只有數牌；以對子為軸（線對稱）或對稱點（點對稱）
+  if (!all.some(isHonor) && !isHonor(pair.kind)) {
+    const grid = [0, 1, 2].map((s) => Array.from({ length: 9 }, (_, i) => all.filter((k) => k === s * 9 + i).length));
+    const axis = pair.kind % 9;
+    const line = grid.every((row) => {
+      for (let d = 1; d <= 8; d++) {
+        const l = axis - d >= 0 ? row[axis - d] : 0;
+        const r = axis + d <= 8 ? row[axis + d] : 0;
+        if (l !== r) return false;
+      }
+      return true;
+    });
+    if (line) hits.push(hit('13.1'));
+    const ps = suitOf(pair.kind);
+    const point = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]].some((order) => {
+      // order[row] = 花色；對稱中心是對子所在的格子
+      const pr = order.indexOf(ps);
+      for (let row = 0; row < 3; row++) {
+        for (let i = 0; i < 9; i++) {
+          const n = grid[order[row]][i];
+          if (!n) continue;
+          const mr = 2 * pr - row;
+          const mi = 2 * axis - i;
+          if (mr < 0 || mr > 2 || mi < 0 || mi > 8 || grid[order[mr]][mi] !== n) return false;
+        }
+      }
+      return true;
+    });
+    if (point) hits.push(hit('13.2'));
+  }
 }
 
 /** 全部牌（含槓子的第 4 張）的牌種 */
@@ -454,28 +662,35 @@ export function evaluateWin(input: WinInput): HandScore | null {
       consider(finalize(hits, 'thirteenOrphans', [], input.baseScore));
     }
   }
+  // 十三不搭（擴充）：比照七對子，可以再加計不求人等與拆法無關的牌型
+  if (input.expansion && input.melds.length === 0 && isThirteenUnrelated(counts)) {
+    const hits: YakuHit[] = [hit('11.3')];
+    tileYaku(all, input, hits);
+    consider(finalize(hits, 'thirteenUnrelated', [], input.baseScore));
+  }
   return best;
 }
 
 /** 是否能構成和牌形（不論分數） */
-export function isWinningShape(concealed: TileKind[], meldCount: number, advanced: boolean): boolean {
+export function isWinningShape(concealed: TileKind[], meldCount: number, advanced: boolean, expansion = false): boolean {
   if (concealed.length !== 14 - meldCount * 3) return false;
   const counts = countKinds(concealed);
   if (decomposeStandard(counts).length > 0) return true;
-  if (advanced && meldCount === 0) return isSevenPairs(counts) || isThirteenOrphans(counts);
+  if (advanced && meldCount === 0 && (isSevenPairs(counts) || isThirteenOrphans(counts))) return true;
+  if (expansion && meldCount === 0 && isThirteenUnrelated(counts)) return true;
   return false;
 }
 
 /**
  * 聽的牌（13 - 3n 張手牌時）。已在自己手牌與鳴牌中用盡 4 張的牌不算。
  */
-export function waitingKinds(concealed: TileKind[], melds: Meld[], advanced: boolean): TileKind[] {
+export function waitingKinds(concealed: TileKind[], melds: Meld[], advanced: boolean, expansion = false): TileKind[] {
   if (concealed.length !== 13 - melds.length * 3) return [];
   const used = countKinds([...concealed, ...melds.flatMap((m) => m.tiles.map(kindOf))]);
   const out: TileKind[] = [];
   for (let k = 0; k < KIND_COUNT; k++) {
     if (used[k] >= 4) continue;
-    if (isWinningShape([...concealed, k], melds.length, advanced)) out.push(k);
+    if (isWinningShape([...concealed, k], melds.length, advanced, expansion)) out.push(k);
   }
   return out;
 }
@@ -487,13 +702,14 @@ export function bestTenpaiScore(
   seatWind: TileKind,
   advanced: boolean,
   baseScore: number,
+  expansion = false,
 ): { score: HandScore; waits: TileKind[]; tile: TileKind; tsumo: boolean } | null {
-  const waits = waitingKinds(concealed, melds, advanced);
+  const waits = waitingKinds(concealed, melds, advanced, expansion);
   if (!waits.length) return null;
   let best: { score: HandScore; tile: TileKind; tsumo: boolean } | null = null;
   for (const w of waits) {
     for (const tsumo of [true, false]) {
-      const s = evaluateWin({ concealed: [...concealed, w], melds, winTile: w, tsumo, seatWind, advanced, baseScore });
+      const s = evaluateWin({ concealed: [...concealed, w], melds, winTile: w, tsumo, seatWind, advanced, baseScore, expansion });
       if (s && (!best || s.total > best.score.total)) best = { score: s, tile: w, tsumo };
     }
   }

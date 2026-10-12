@@ -12,6 +12,7 @@ interface Case {
   tsumo?: boolean;
   advanced?: boolean;
   seatWind?: number;
+  expansion?: boolean;
 }
 
 function score(c: Case) {
@@ -23,6 +24,7 @@ function score(c: Case) {
     tsumo: !!c.tsumo,
     seatWind: c.seatWind ?? EAST,
     advanced: !!c.advanced,
+    expansion: !!c.expansion,
     baseScore: c.advanced ? 0 : 20,
   });
 }
@@ -35,12 +37,12 @@ const tableExamples: [string, Case][] = [
   ['全求人', { hand: '🀀', melds: [meld('🀉🀊🀋'), meld('🀛🀛🀛'), meld('🀞🀟🀠'), meld('🀓🀔🀕')], win: '🀀' }],
   ['斷么九', { hand: '🀞🀠🀔🀔🀕🀕🀕', melds: [meld('🀋🀌🀍'), meld('🀚🀛🀜')], win: '🀟' }],
   ['全帶么九', { hand: '🀇🀈🀉🀟🀠🀀🀀', melds: [meld('🀐🀑🀒'), meld('🀘🀘🀘')], win: '🀡' }],
-  ['二對清么', { hand: '🀉🀉🀉🀔🀔🀟🀠', melds: [meld('🀐🀑🀒'), meld('🀘🀘🀘')], win: '🀞' }],
-  ['三對清么', { hand: '🀘🀘🀀🀀', melds: [meld('🀑🀒🀓'), meld('🀡🀡🀡'), meld('🀂🀂🀂')], win: '🀘' }],
-  ['四對清么', { hand: '🀈🀉🀊🀙🀙🀘🀘', melds: [meld('🀒🀓🀔'), meld('🀡🀡🀡')], win: '🀘' }],
-  ['五對清么', { hand: '🀘🀘🀀🀀', melds: [meld('🀐🀐🀐'), meld('🀡🀡🀡🀡'), meld('🀒🀓🀔')], win: '🀘' }],
-  ['六對清么', { hand: '🀉🀉🀙🀙🀙🀘🀘', melds: [meld('🀐🀐🀐'), meld('🀡🀡🀡')], win: '🀘' }],
-  ['七對清么', { hand: '🀇🀇🀙🀚🀛🀘🀘', melds: [meld('🀐🀐🀐🀐'), meld('🀡🀡🀡🀡')], win: '🀘' }],
+  ['四清么', { hand: '🀉🀉🀉🀔🀔🀟🀠', melds: [meld('🀐🀑🀒'), meld('🀘🀘🀘')], win: '🀞' }],
+  ['六清么', { hand: '🀘🀘🀀🀀', melds: [meld('🀑🀒🀓'), meld('🀡🀡🀡'), meld('🀂🀂🀂')], win: '🀘' }],
+  ['八清么', { hand: '🀈🀉🀊🀙🀙🀘🀘', melds: [meld('🀒🀓🀔'), meld('🀡🀡🀡')], win: '🀘' }],
+  ['十清么', { hand: '🀘🀘🀀🀀', melds: [meld('🀐🀐🀐'), meld('🀡🀡🀡🀡'), meld('🀒🀓🀔')], win: '🀘' }],
+  ['十二清么', { hand: '🀉🀉🀙🀙🀙🀘🀘', melds: [meld('🀐🀐🀐'), meld('🀡🀡🀡')], win: '🀘' }],
+  ['十四清么', { hand: '🀇🀇🀙🀚🀛🀘🀘', melds: [meld('🀐🀐🀐🀐'), meld('🀡🀡🀡🀡')], win: '🀘' }],
   ['五門齊', { hand: '🀋🀌🀍🀞🀠🀆🀆', melds: [meld('🀓🀔🀕'), meld('🀀🀀🀀')], win: '🀟' }],
   ['缺一色', { hand: '🀈🀉🀊🀋🀌🀑🀑', melds: [meld('🀎🀎🀎'), meld('🀘🀘🀘')], win: '🀊' }],
   ['混一色', { hand: '🀈🀉🀊🀋🀌🀀🀀', melds: [meld('🀎🀎🀎'), meld('🀂🀂🀂')], win: '🀊' }],
@@ -92,6 +94,82 @@ describe('牌型表牌例', () => {
       expect(names(c)).toContain(name);
     });
   }
+});
+
+// 牌型擴充包：規則書補頁草稿的牌例（張數或條件有誤者已修正）
+const X = { advanced: true, expansion: true };
+const expansionExamples: [string, Case][] = [
+  ['小二元', { hand: '🀞🀟🀓🀔🀕🀆🀆', melds: [meld('🀄🀄🀄'), meld('🀉🀊🀋')], win: '🀠', ...X }],
+  ['大二元', { hand: '🀞🀟🀠🀓🀔🀕🀀', melds: [meld('🀄🀄🀄'), meld('🀅🀅🀅')], win: '🀀', ...X }],
+  ['小二風', { hand: '🀌🀍🀎🀁🀞🀟🀠', melds: [meld('🀃🀃🀃'), meld('🀉🀊🀋')], win: '🀁', ...X }],
+  ['大二風', { hand: '🀌🀍🀎🀗🀗🀞🀟', melds: [meld('🀃🀃🀃'), meld('🀀🀀🀀')], win: '🀠', ...X }],
+  ['連面子', { hand: '🀑🀑🀀🀀🀙🀚🀛', melds: [meld('🀐🀐🀐'), meld('🀞🀟🀠')], win: '🀑', ...X }],
+  ['二龍戲', { hand: '🀇🀈🀉🀊🀋🀌🀛🀜🀝🀞🀟🀠🀀', win: '🀀', ...X }],
+  ['三連環', { hand: '🀇🀈🀉🀊🀋🀋🀌🀍🀀🀀', melds: [meld('🀙🀙🀙')], win: '🀉', ...X }],
+  ['四連環', { hand: '🀇🀈🀈🀉🀉🀉🀊🀊🀊🀋🀋🀌🀙', win: '🀙', ...X }],
+  ['三連跳', { hand: '🀇🀇🀇🀉🀉🀉🀋🀋🀀🀀', melds: [meld('🀙🀚🀛')], win: '🀋', ...X }],
+  ['四連跳', { hand: '🀇🀇🀇🀉🀉🀉🀋🀋🀋🀍🀍🀀🀀', win: '🀍', ...X }],
+  ['鏡面子', { hand: '🀋🀋🀋🀔🀔🀀🀀', melds: [meld('🀙🀚🀛'), meld('🀞🀟🀠')], win: '🀔', ...X }],
+  ['鏡同和', { hand: '🀇🀈🀉🀊🀋🀌🀙🀚🀛🀜🀝🀞🀟', win: '🀟', ...X }],
+  ['三色連環', { hand: '🀇🀈🀛🀜🀝🀔🀕🀖🀀🀀', melds: [meld('🀙🀙🀙')], win: '🀉', ...X }],
+  ['三色連跳', { hand: '🀈🀈🀈🀜🀜🀜🀕🀕🀀🀀', melds: [meld('🀙🀚🀛')], win: '🀕', ...X }],
+  ['四歸一', { hand: '🀊🀋🀋🀋🀌🀞🀟🀠🀀🀀', melds: [meld('🀙🀚🀛')], win: '🀋', ...X }],
+  ['八歸一', { hand: '🀊🀋🀋🀋🀋🀌🀟🀠🀠🀠🀠🀡🀀', win: '🀀', ...X }],
+  ['十二歸一', { hand: '🀇🀇🀇🀇🀈🀈🀈🀈🀉🀉🀉🀉🀀', win: '🀀', ...X }],
+  ['十三不搭', { hand: '🀇🀊🀍🀚🀝🀠🀒🀕🀘🀀🀁🀂🀃', win: '🀀', ...X }],
+  ['線對稱', { hand: '🀇🀈🀉🀍🀎🀏🀙🀚🀛🀟🀠🀡🀔', win: '🀔', ...X }],
+  ['點對稱', { hand: '🀇🀈🀉🀙🀚🀛🀟🀠🀡🀖🀗🀘🀝', win: '🀝', ...X }],
+];
+
+describe('牌型擴充包', () => {
+  for (const [name, c] of expansionExamples) {
+    it(name, () => {
+      expect(score(c), `${name} 應為和牌形`).not.toBeNull();
+      expect(names(c)).toContain(name);
+    });
+  }
+
+  it('沒有選用擴充包時不會出現擴充牌型，十三不搭也不是和牌形', () => {
+    for (const [name, c] of expansionExamples) {
+      const s = score({ ...c, expansion: false });
+      if (s) expect(s.yaku.map((y) => y.name)).not.toContain(name);
+    }
+    expect(score({ hand: '🀇🀊🀍🀚🀝🀠🀒🀕🀘🀀🀁🀂🀃', win: '🀀', advanced: true })).toBeNull();
+  });
+
+  it('十三不搭（數牌六種）比照七對子，可以加計不求人', () => {
+    const s = score({ hand: '🀊🀍🀝🀠🀕🀘🀀🀁🀂🀃🀄🀅🀆', win: '🀆', ...X })!;
+    expect(s.form).toBe('thirteenUnrelated');
+    expect(s.yaku.map((y) => y.name)).toEqual(expect.arrayContaining(['十三不搭', '不求人']));
+  });
+
+  it('十三不搭：同花色數牌相鄰或隔一張（搭子）就不成立', () => {
+    // 索子 7、9 隔一張（坎張搭子）
+    expect(score({ hand: '🀊🀍🀝🀠🀖🀘🀀🀁🀂🀃🀄🀅🀆', win: '🀆', ...X })).toBeNull();
+  });
+
+  it('同系列只取最高分：大二元與小三元同時成立時只計小三元', () => {
+    const n = names({ hand: '🀞🀟🀠🀓🀔🀕🀆🀅🀅🀅', melds: [meld('🀄🀄🀄')], win: '🀆', ...X });
+    expect(n).toContain('小三元');
+    expect(n).not.toContain('大二元');
+    expect(n).not.toContain('小二元');
+  });
+
+  it('二龍戲與連面子同系列：兩組連面子時只計二龍戲 40', () => {
+    const s = score(expansionExamples.find(([n]) => n === '二龍戲')![1])!;
+    expect(s.yaku.map((y) => y.name)).not.toContain('連面子');
+  });
+
+  it('連面子、鏡面子每組加計', () => {
+    // 123m 456m 456s 789p + 東對：連面子 1 組（123m＋456m）、鏡面子 1 組（456m＋456s）
+    const s = score({ hand: '🀇🀈🀊🀋🀌🀟🀠🀡🀀🀀', melds: [meld('🀓🀔🀕')], win: '🀉', ...X })!;
+    expect(s.yaku.find((y) => y.name === '連面子')?.points).toBe(5);
+    expect(s.yaku.find((y) => y.name === '鏡面子')?.points).toBe(5);
+  });
+
+  it('點對稱的牌例不是線對稱', () => {
+    expect(names(expansionExamples.find(([n]) => n === '點對稱')![1])).not.toContain('線對稱');
+  });
 });
 
 describe('分數計算', () => {

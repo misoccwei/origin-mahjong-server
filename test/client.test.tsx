@@ -1,6 +1,7 @@
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { TableScreen } from '../src/client/components/Table.js';
+import { YakuTable } from '../src/client/components/YakuTable.js';
 import type { AppState } from '../src/client/net.js';
 import type { GameView, HandResultView, PlayerView, RoomView } from '../src/shared/protocol.js';
 import { defaultSettings } from '../src/shared/rules.js';
@@ -69,6 +70,7 @@ function game(patch: Partial<GameView> = {}): GameView {
     passSent: null,
     passReceived: null,
     myWaits: [],
+    myWaitScore: null,
     auto: { on: false, win: false, onlyMax: true },
     thinkAvailable: false,
     result: null,
@@ -165,10 +167,13 @@ describe('牌桌畫面', () => {
     expect(render(room(), { ...g, auto: { on: false, win: false, onlyMax: false } })).not.toContain('不槓');
   });
 
-  it('聽牌時在手牌上方顯示聽的牌與剩餘張數', () => {
-    const html = render(room(), game({ myWaits: [{ kind: 27, left: 3 }] }));
+  it('聽牌時在手牌上方顯示聽的牌、剩餘張數與預計得分（同分只寫一個）', () => {
+    const html = render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 20, max: 45 } }));
     expect(html).toContain('聽牌：');
     expect(html).toContain('×<!-- -->3');
+    expect(html).toContain('預計 20～45 分');
+    expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 40, max: 40 } }))).toContain('預計 40 分');
+    expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: null }))).toContain('未達和牌最低分數');
   });
 
 
@@ -246,5 +251,24 @@ describe('結算畫面', () => {
   it('舊格式（缺少 shown 欄位）不會讓畫面掛掉', () => {
     const { shown: _omit, ...old } = baseResult;
     expect(() => render(room(), game({ phase: 'result', result: old as HandResultView }))).not.toThrow();
+  });
+});
+
+describe('牌型表', () => {
+  it('列出所有牌型（含擴充與改名後的清么），並有種類與分數篩選', () => {
+    const html = renderToString(<YakuTable />);
+    expect(html).toContain('四清么');
+    expect(html).not.toContain('二對清么');
+    expect(html).toContain('十三不搭');
+    expect(html).toContain('對稱類');
+    expect(html).toContain('任何分數');
+    expect(html).toMatch(/共 <!-- -->76<!-- --> 個牌型/);
+  });
+
+  it('牌局中預設只列出這桌適用的牌型', () => {
+    const name = (n: string) => new RegExp(`class="yaku-name">${n}<`);
+    expect(renderToString(<YakuTable advanced expansion={false} defaultShowAll={false} />)).not.toMatch(name('十三不搭'));
+    expect(renderToString(<YakuTable advanced expansion={false} defaultShowAll={false} />)).toMatch(name('七對子'));
+    expect(renderToString(<YakuTable advanced={false} expansion={false} defaultShowAll={false} />)).not.toMatch(name('七對子'));
   });
 });

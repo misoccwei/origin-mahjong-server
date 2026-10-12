@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AILevelSelect, NumInput } from './Inputs.js';
+import { YakuTable } from './YakuTable.js';
 import { DEFAULT_ROUNDS, defaultSettings, type RuleSettings } from '../../shared/rules.js';
 import { send, type AppState } from '../net.js';
 
@@ -81,6 +82,10 @@ export function SettingsForm({
       <label className="check">
         <input type="checkbox" checked={value.passThree} onChange={(e) => up({ passThree: e.target.checked })} />
         換三張（配牌後可選擇把 3 張牌換給下家）
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={value.expansion} onChange={(e) => up({ expansion: e.target.checked })} />
+        牌型擴充包（二元／二風、連面子、鏡面子、四歸一、十三不搭、對稱類等 20 個牌型）
       </label>
       <label className="check">
         <input type="checkbox" checked={value.smallHandLimit} onChange={(e) => up({ smallHandLimit: e.target.checked })} />
@@ -188,6 +193,10 @@ export function LobbyScreen({ state }: { state: AppState }) {
         <button className="primary" onClick={() => send({ t: 'createRoom', settings })}>
           建立房間
         </button>
+      </div>
+      <div className="panel wide">
+        <h2>牌型表</h2>
+        <YakuTable />
       </div>
       <p className="muted small">
         {state.nickname}（{state.userId?.slice(0, 8)}）
