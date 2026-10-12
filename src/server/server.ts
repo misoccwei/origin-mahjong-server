@@ -153,7 +153,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (!r.ok) return send(c.ws, { t: 'error', code: 'nickname', message: r.error });
       send(c.ws, { t: 'nicknameOk', nickname: r.nickname });
       const room = u.roomId ? rooms.get(u.roomId) : undefined;
-      if (room) room.join(userId, r.nickname); // 更新座位上的暱稱
+      if (room?.isSpectator(userId)) room.renameSpectator(userId, r.nickname);
+      else if (room) room.join(userId, r.nickname); // 更新座位上的暱稱
       else pushState(userId);
       return;
     }
@@ -182,6 +183,15 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         u.roomId = target.id;
         const r = target.join(userId, u.nickname);
         if (!r.ok) u.roomId = room?.id ?? null;
+        return reply(c, r);
+      }
+      case 'spectate': {
+        const target = rooms.get(String(msg.roomId ?? '').trim());
+        if (!target) return send(c.ws, { t: 'error', code: 'room', message: '找不到這個房號' });
+        if (room) return send(c.ws, { t: 'error', code: 'room', message: '請先離開目前的房間' });
+        u.roomId = target.id;
+        const r = target.spectate(userId, u.nickname);
+        if (!r.ok) u.roomId = null;
         return reply(c, r);
       }
       default:
@@ -224,7 +234,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         // 只轉給同房間的其他真人；內容不解讀
         const to = String(msg.to ?? '');
         const ids = room.humanUserIds();
-        if (to === userId || !ids.includes(to) || !msg.data || typeof msg.data !== 'object') return;
+        // 觀戰者不能參與語音
+        if (to === userId || !ids.includes(userId) || !ids.includes(to) || !msg.data || typeof msg.data !== 'object') return;
         const target = conns.get(to);
         if (target) send(target.ws, { t: 'rtc', from: userId, data: msg.data });
         return;

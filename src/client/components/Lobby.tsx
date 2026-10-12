@@ -84,6 +84,10 @@ export function SettingsForm({
         換三張（配牌後可選擇把 3 張牌換給下家）
       </label>
       <label className="check">
+        <input type="checkbox" checked={value.allowSpectators} onChange={(e) => up({ allowSpectators: e.target.checked })} />
+        允許觀戰（觀戰者只看得到公開資訊，不能參與語音）
+      </label>
+      <label className="check">
         <input type="checkbox" checked={value.expansion} onChange={(e) => up({ expansion: e.target.checked })} />
         牌型擴充包（二元／二風、連面子、鏡面子、四歸一、十三不搭、對稱類等 20 個牌型）
       </label>
@@ -125,7 +129,9 @@ export function SettingsForm({
   );
 }
 
-/** 等待中的房間：每 3 秒更新一次，點一下就加入 */
+const STATUS_LABEL = { waiting: '等待中', playing: '對局中', finished: '已結束' } as const;
+
+/** 房間列表：等待中有空位的可以加入，允許觀戰的可以觀戰；每 3 秒更新一次 */
 function RoomList({ state }: { state: AppState }) {
   useEffect(() => {
     const refresh = () => send({ t: 'listRooms' });
@@ -135,9 +141,9 @@ function RoomList({ state }: { state: AppState }) {
   }, [state.conn]);
   return (
     <div className="room-list">
-      <h3>等待中的房間</h3>
+      <h3>房間列表</h3>
       {state.roomList.length === 0 ? (
-        <p className="muted small">目前沒有等待中的房間，可以自己建立一個。</p>
+        <p className="muted small">目前沒有可以加入或觀戰的房間，可以自己建立一個。</p>
       ) : (
         <ul>
           {state.roomList.map((r) => (
@@ -145,12 +151,18 @@ function RoomList({ state }: { state: AppState }) {
               <div className="room-info">
                 <div className="room-host">{r.hostName} 的房間</div>
                 <div className="muted small">
-                  {r.seated} / {r.playerCount} 人・{r.advanced ? '進階規則' : '基本規則'}・{r.scoring === 'zeroSum' ? '零和式' : '加分式'}・{r.id}
+                  {STATUS_LABEL[r.status]}・{r.seated} / {r.playerCount} 人・{r.advanced ? '進階規則' : '基本規則'}・{r.scoring === 'zeroSum' ? '零和式' : '加分式'}
+                  {r.spectators > 0 && `・${r.spectators} 人觀戰`}・{r.id}
                 </div>
               </div>
-              <button className="primary" onClick={() => send({ t: 'joinRoom', roomId: r.id })}>
-                加入
-              </button>
+              <div className="room-btns">
+                {r.joinable && (
+                  <button className="primary" onClick={() => send({ t: 'joinRoom', roomId: r.id })}>
+                    加入
+                  </button>
+                )}
+                {r.spectatable && <button onClick={() => send({ t: 'spectate', roomId: r.id })}>觀戰</button>}
+              </div>
             </li>
           ))}
         </ul>
@@ -173,8 +185,11 @@ export function LobbyScreen({ state }: { state: AppState }) {
           }}
         >
           <input inputMode="numeric" maxLength={4} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="4 位數房號" />
-          <button type="submit" className="primary" disabled={code.length !== 6}>
+          <button type="submit" className="primary" disabled={code.length !== 4}>
             加入
+          </button>
+          <button type="button" disabled={code.length !== 4} onClick={() => send({ t: 'spectate', roomId: code.trim() })}>
+            觀戰
           </button>
         </form>
         <RoomList state={state} />

@@ -285,6 +285,60 @@ describe('語音 signaling', () => {
   });
 });
 
+describe('觀戰', () => {
+  it('觀戰者只看到公開資訊、不能操作也不能參與語音；房間關閉時一起離開', async () => {
+    const host = await client('Sp1');
+    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 0, claimSeconds: 0, passThree: false } });
+    const room = await host.waitFor(() => host.room);
+    host.send({ t: 'addAI' });
+    await host.waitFor(() => host.room?.players[1].nickname);
+    host.send({ t: 'start' });
+    await host.waitFor(() => host.game);
+    const spec = await client('Sp2');
+    spec.send({ t: 'spectate', roomId: room.id });
+    const g = await spec.waitFor(() => spec.game);
+    expect(spec.room!.mySeat).toBeNull();
+    expect(g.myHand).toEqual([]);
+    expect(g.pending).toBeNull();
+    expect(spec.room!.players[0].handCount).toBeGreaterThan(0);
+    await host.waitFor(() => host.room?.spectators.some((s) => s.nickname === 'Sp2'));
+    // 不能操作
+    spec.send({ t: 'action', handNo: g.handNo, action: { type: 'pass' } });
+    spec.send({ t: 'ready', ready: true });
+    await spec.waitFor(() => spec.errors.length >= 2);
+    // 不能參與語音（傳不出去）
+    spec.send({ t: 'rtc', to: host.userId, data: { k: 'hello', sid: 'x', mic: true } });
+    // 已在觀戰時不能再加入別的房間
+    spec.send({ t: 'joinRoom', roomId: room.id });
+    await spec.waitFor(() => spec.errors.some((e) => e.includes('已經開始')));
+    host.send({ t: 'ping' });
+    await host.waitFor(() => host.messages.find((m) => m.t === 'pong'));
+    expect(host.messages.some((m) => m.t === 'rtc')).toBe(false);
+    // 最後一位真人離開 → 房間關閉，觀戰者也回到大廳
+    host.send({ t: 'leaveRoom' });
+    await spec.waitFor(() => spec.room === null);
+  });
+
+  it('等待中觀戰後入座；房主關閉觀戰時觀戰者被請出', async () => {
+    const host = await client('Sp3');
+    host.send({ t: 'createRoom', settings: { playerCount: 3 } });
+    const room = await host.waitFor(() => host.room);
+    const a = await client('Sp4');
+    a.send({ t: 'spectate', roomId: room.id });
+    await a.waitFor(() => a.room && a.room.mySeat === null);
+    a.send({ t: 'joinRoom', roomId: room.id });
+    await a.waitFor(() => a.room?.mySeat === 1);
+    expect(a.room!.spectators).toEqual([]);
+    const b = await client('Sp5');
+    b.send({ t: 'spectate', roomId: room.id });
+    await b.waitFor(() => b.room);
+    host.send({ t: 'updateSettings', settings: { allowSpectators: false } });
+    await b.waitFor(() => b.room === null);
+    b.send({ t: 'spectate', roomId: room.id });
+    await b.waitFor(() => b.errors.some((e) => e.includes('不開放觀戰')));
+  });
+});
+
 describe('對局', () => {
   it('2 真人 + 2 AI 打完一圈，結算後加一圈', async () => {
     const host = await client('P1');
@@ -566,7 +620,7 @@ describe('對局', () => {
     await host.waitFor(() => host.errors.some((e) => e.includes('長考過')));
   });
 
-  it('大廳房間列表：只列出等待中、有空位的房間與房主名稱', async () => {
+  it('大廳房間列表：等待中有空位的可以加入；坐滿後仍可觀戰，不允許觀戰就不列出', async () => {
     const host = await client('AE1');
     host.send({ t: 'createRoom', settings: { playerCount: 2 } });
     const room = await host.waitFor(() => host.room);
@@ -574,13 +628,21 @@ describe('對局', () => {
     viewer.send({ t: 'listRooms' });
     const list = await viewer.waitFor(() => viewer.messages.find((m) => m.t === 'roomList'));
     expect(list).toMatchObject({ rooms: expect.arrayContaining([expect.objectContaining({ id: room.id, hostName: 'AE1', seated: 1, playerCount: 2 })]) });
-    // 坐滿之後就不列出
+    expect(list).toMatchObject({ rooms: expect.arrayContaining([expect.objectContaining({ id: room.id, joinable: true, spectatable: true })]) });
+    // 坐滿之後不能加入，但還能觀戰
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    viewer.messages.length = 0;
-    viewer.send({ t: 'listRooms' });
-    const list2 = await viewer.waitFor(() => viewer.messages.find((m) => m.t === 'roomList'));
-    expect(list2 && list2.t === 'roomList' && list2.rooms.some((r) => r.id === room.id)).toBe(false);
+    const listOf = async () => {
+      viewer.messages.length = 0;
+      viewer.send({ t: 'listRooms' });
+      const m = await viewer.waitFor(() => viewer.messages.find((x) => x.t === 'roomList'));
+      return m.t === 'roomList' ? m.rooms.find((r) => r.id === room.id) : undefined;
+    };
+    expect(await listOf()).toMatchObject({ joinable: false, spectatable: true });
+    // 不允許觀戰：坐滿就不列出
+    host.send({ t: 'updateSettings', settings: { allowSpectators: false } });
+    await host.waitFor(() => host.room?.settings.allowSpectators === false);
+    expect(await listOf()).toBeUndefined();
   });
 
   it('逾時自動摸切', async () => {

@@ -43,6 +43,7 @@ function room(patch: Partial<RoomView> = {}): RoomView {
     paused: null,
     history: [],
     dissolved: false,
+    spectators: [],
     ...patch,
   };
 }
@@ -85,6 +86,18 @@ function render(r: RoomView, g: GameView | null) {
 }
 
 describe('牌桌畫面', () => {
+  it('觀戰：沒有手牌與操作，下方玩家也以牌背顯示，可以切換視角與離開觀戰', () => {
+    const r = room({ mySeat: null, players: [0, 1, 2, 3].map((s) => player(s, { userId: s === 0 ? 'p0' : null })) });
+    const html = render(r, game({ myHand: [] }));
+    expect(html).toContain('觀戰中');
+    expect(html).toContain('離開觀戰');
+    expect(html).toContain('視角：');
+    expect(html).not.toContain('推薦牌型');
+    expect(html).not.toContain('自動摸打');
+    // 四家都顯示牌背（下方也是）
+    expect((html.match(/class="side-hand"/g) ?? []).length).toBe(4);
+  });
+
   it('換三張選牌階段：牌桌上有 3 個候選格與換出／不換', () => {
     const html = render(room(), game({ phase: 'passThree', pending: { kind: 'passThree' }, waitingSeats: [0] }));
     expect(html).toMatch(/class="pass-overlay"/);

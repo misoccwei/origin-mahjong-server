@@ -63,6 +63,8 @@ export class Room {
   private windowId = '';
   private deadline: number | null = null;
   private aiCounter = 0;
+  /** 觀戰者：userId → 暱稱與斷線時間 */
+  spectators = new Map<string, { nickname: string; offlineSince: number | null }>();
 
   constructor(id: string, settings: RuleSettings, private deps: RoomDeps) {
     this.id = id;
@@ -80,6 +82,15 @@ export class Room {
 
   humanUserIds(): string[] {
     return this.seats.filter((s): s is Seat => !!s && !!s.userId && !s.left).map((s) => s.userId!);
+  }
+
+  /** 收狀態推送的人：在座的真人與觀戰者 */
+  private audienceIds(): string[] {
+    return [...this.humanUserIds(), ...this.spectators.keys()];
+  }
+
+  isSpectator(userId: string): boolean {
+    return this.spectators.has(userId);
   }
 
   private isOnlineSeat(i: number): boolean {
@@ -114,13 +125,41 @@ export class Room {
     if (this.status !== 'waiting') return fail('牌局已經開始，無法加入');
     const free = this.seats.findIndex((s) => s === null);
     if (free < 0) return fail('房間已滿');
+    this.spectators.delete(userId);
     this.seats[free] = { userId, nickname, isAI: false, aiControlled: false, ready: false, left: false, offlineSince: null };
     if (!this.seats.some((s, i) => i !== free && s && !s.isAI)) this.hostSeat = free;
     this.afterChange();
     return ok;
   }
 
+  /** 觀戰：不佔座位，只看公開資訊 */
+  spectate(userId: string, nickname: string): RoomResult {
+    if (this.seatOf(userId) >= 0) return fail('你已經在這個房間的座位上');
+    if (!this.settings.allowSpectators) return fail('這個房間不開放觀戰');
+    this.spectators.set(userId, { nickname, offlineSince: null });
+    this.afterChange();
+    return ok;
+  }
+
+  /** 觀戰者改暱稱 */
+  renameSpectator(userId: string, nickname: string) {
+    const s = this.spectators.get(userId);
+    if (!s) return;
+    s.nickname = nickname;
+    this.afterChange();
+  }
+
+  private removeSpectator(userId: string) {
+    if (!this.spectators.delete(userId)) return;
+    this.deps.onUserRemoved(userId);
+  }
+
   leave(userId: string): RoomResult {
+    if (this.spectators.has(userId)) {
+      this.removeSpectator(userId);
+      this.afterChange();
+      return ok;
+    }
     const seat = this.seatOf(userId);
     if (seat < 0) return fail('不在房間中');
     if (this.status === 'waiting') {
@@ -150,6 +189,12 @@ export class Room {
 
   /** 連線狀態改變時由伺服器呼叫 */
   connectionChanged(userId: string) {
+    const spec = this.spectators.get(userId);
+    if (spec) {
+      spec.offlineSince = this.deps.isOnline(userId) ? null : Date.now();
+      this.afterChange();
+      return;
+    }
     const seat = this.seatOf(userId);
     if (seat < 0) return;
     const s = this.seats[seat]!;
@@ -161,8 +206,18 @@ export class Room {
 
   /** 定期呼叫：等待中的房間移除斷線過久的玩家 */
   sweep(now = Date.now()) {
-    if (this.status !== 'waiting') return;
     let changed = false;
+    // 觀戰者斷線過久就移出（不論牌局狀態）
+    for (const [id, s] of [...this.spectators]) {
+      if (s.offlineSince !== null && now - s.offlineSince >= this.deps.waitingOfflineMs) {
+        this.removeSpectator(id);
+        changed = true;
+      }
+    }
+    if (this.status !== 'waiting') {
+      if (changed) this.afterChange();
+      return;
+    }
     this.seats.forEach((s, i) => {
       if (s && !s.isAI && s.offlineSince !== null && now - s.offlineSince >= this.deps.waitingOfflineMs) {
         this.seats[i] = null;
@@ -197,6 +252,7 @@ export class Room {
       next.handicaps = {};
     }
     this.settings = next;
+    if (!next.allowSpectators) for (const id of [...this.spectators.keys()]) this.removeSpectator(id);
     // 設定變更後重新確認準備
     this.seats.forEach((s) => s && !s.isAI && (s.ready = false));
     this.afterChange();
@@ -358,12 +414,18 @@ export class Room {
 
   /** 大廳列表用：還在等待、有空位的房間 */
   summary(): RoomSummary | null {
-    if (this.status !== 'waiting' || this.destroyed) return null;
+    if (this.destroyed) return null;
     const seated = this.seats.filter(Boolean).length;
-    if (seated >= this.seats.length) return null;
+    const joinable = this.status === 'waiting' && seated < this.seats.length;
+    const spectatable = this.settings.allowSpectators;
+    if (!joinable && !spectatable) return null;
     return {
       id: this.id,
       hostName: this.seats[this.hostSeat]?.nickname ?? '',
+      status: this.status,
+      joinable,
+      spectatable,
+      spectators: this.spectators.size,
       seated,
       playerCount: this.settings.playerCount,
       advanced: this.settings.advanced,
@@ -447,7 +509,7 @@ export class Room {
       if (this.match) this.match.hand = null;
     }
     this.schedule();
-    this.deps.notify(this.humanUserIds());
+    this.deps.notify(this.audienceIds());
   }
 
   private schedule() {
@@ -548,6 +610,7 @@ export class Room {
     this.destroyed = true;
     this.clearTimers();
     for (const s of this.seats) if (s?.userId && !s.left) this.deps.onUserRemoved(s.userId);
+    for (const id of [...this.spectators.keys()]) this.removeSpectator(id);
     this.deps.onDestroy(this);
   }
 
@@ -585,6 +648,7 @@ export class Room {
       paused: this.paused,
       history: this.match?.history ?? [],
       dissolved: this.dissolved,
+      spectators: [...this.spectators].map(([id, s]) => ({ userId: id, nickname: s.nickname })),
     };
   }
 
@@ -592,7 +656,10 @@ export class Room {
     const m = this.match;
     const hand = m?.hand;
     const seat = this.seatOf(userId);
-    if (!m || !hand || seat < 0) return null;
+    if (!m || !hand) return null;
+    if (seat < 0 && !this.spectators.has(userId)) return null;
+    // 觀戰者（seat = -1）：只有公開資訊，沒有手牌與操作
+    const mine = seat >= 0;
     const phase = hand.phase === 'ended' ? 'result' : hand.phase;
     const r = hand.result;
     return {
@@ -603,24 +670,25 @@ export class Room {
       currentSeat: hand.current,
       wallRemaining: hand.wallRemaining,
       deadWall: hand.deadWall,
-      myHand: [...hand.hands[seat]],
-      myDrawn: hand.current === seat && hand.phase === 'turn' ? hand.drawn : null,
+      myHand: mine ? [...hand.hands[seat]] : [],
+      myDrawn: mine && hand.current === seat && hand.phase === 'turn' ? hand.drawn : null,
       lastDiscard: hand.phase === 'claim' && hand.lastDiscard ? { seat: hand.lastDiscard.seat, tile: hand.lastDiscard.tile } : null,
       kakanTile: hand.kakanPending,
       recentDiscard: (() => {
         const d = hand.discardLog[hand.discardLog.length - 1];
         return d && !d.called && hand.phase !== 'ended' ? { seat: d.seat, tile: d.tile } : null;
       })(),
-      pending: this.seats[seat]!.aiControlled ? null : hand.pending.get(seat) ?? null,
+      pending: !mine || this.seats[seat]!.aiControlled ? null : hand.pending.get(seat) ?? null,
       waitingSeats: [...hand.pending.keys()],
       deadline: this.deadline,
       passThreeDone: this.seats.map((_, i) => hand.phase === 'passThree' && !hand.pending.has(i)),
-      passSent: hand.passSent[seat],
-      passReceived: hand.passReceived[seat],
-      myWaits: hand.waitsFor(seat),
-      myWaitScore: hand.waitScore(seat),
-      auto: { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true },
+      passSent: mine ? hand.passSent[seat] : null,
+      passReceived: mine ? hand.passReceived[seat] : null,
+      myWaits: mine ? hand.waitsFor(seat) : [],
+      myWaitScore: mine ? hand.waitScore(seat) : null,
+      auto: mine ? { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true } : { on: false, win: false, onlyMax: true },
       thinkAvailable:
+        mine &&
         !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,
       result: r
         ? {

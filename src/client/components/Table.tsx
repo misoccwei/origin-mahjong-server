@@ -63,7 +63,7 @@ function River({ p, lastDiscard, pointKind }: { p: PlayerView; lastDiscard: Game
 }
 
 /** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉 */
-function Side({ p, game, pos, pointKind }: { p: PlayerView; game: GameView; pos: Pos; pointKind: TileKind | null }) {
+function Side({ p, game, pos, pointKind, showHand }: { p: PlayerView; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
   const active = game.currentSeat === p.seat && game.phase === 'turn';
   return (
     <div className={`side pos-${pos}`}>
@@ -72,7 +72,7 @@ function Side({ p, game, pos, pointKind }: { p: PlayerView; game: GameView; pos:
         <span className="score">{p.score}</span>
       </div>
       <River p={p} lastDiscard={game.lastDiscard} pointKind={pointKind} />
-      {pos !== 'bottom' && (
+      {showHand && (
         <div className="side-hand">
           {Array.from({ length: p.handCount - (p.hasDrawn ? 1 : 0) }, (_, i) => (
             <Tile key={i} back />
@@ -165,6 +165,21 @@ function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['
   );
 }
 
+/** 牌型表（預設只列出這桌適用的牌型） */
+function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal yaku-modal">
+        <div className="reco-head">
+          <h2>牌型表</h2>
+          <button className="link" onClick={onClose} aria-label="關閉">✕</button>
+        </div>
+        <YakuTable advanced={room.settings.advanced} expansion={room.settings.expansion} defaultShowAll={false} />
+      </div>
+    </div>
+  );
+}
+
 /** ⚙ 選單：較少用的設定（只和最高分、電腦難度、全螢幕、離開），收起來讓工具列在手機上一排放得下 */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
@@ -233,17 +248,7 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
           </div>
         </div>
       )}
-      {showYaku && (
-        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowYaku(false)}>
-          <div className="modal yaku-modal">
-            <div className="reco-head">
-              <h2>牌型表</h2>
-              <button className="link" onClick={() => setShowYaku(false)} aria-label="關閉">✕</button>
-            </div>
-            <YakuTable advanced={room.settings.advanced} expansion={room.settings.expansion} defaultShowAll={false} />
-          </div>
-        </div>
-      )}
+      {showYaku && <YakuModal room={room} onClose={() => setShowYaku(false)} />}
     </div>
   );
 }
@@ -640,8 +645,8 @@ function Delta({ d }: { d: number }) {
 function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
   const r = game.result as HandResultView;
   const names = room.players.map((p) => p.nickname);
-  const me = room.mySeat!;
-  const acked = r.acknowledged.includes(me);
+  const me = room.mySeat;
+  const acked = me !== null && r.acknowledged.includes(me);
   const shown = r.shown ?? [];
   const remain = game.deadline ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
   const winnerOf = (s: number) => r.winners.find((w) => w.seat === s);
@@ -728,10 +733,14 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
             ))}
           </tbody>
         </table>
-        <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
-          {acked ? '等待其他玩家…' : game.handNo >= game.totalHands ? '查看結算' : '下一局'}
-          {remain !== null ? `（${remain}）` : ''}
-        </button>
+        {me === null ? (
+          <p className="muted small">觀戰中：等待玩家進入下一局{remain !== null ? `（${remain}）` : ''}</p>
+        ) : (
+          <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
+            {acked ? '等待其他玩家…' : game.handNo >= game.totalHands ? '查看結算' : '下一局'}
+            {remain !== null ? `（${remain}）` : ''}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -761,8 +770,8 @@ function PauseOverlay({ room }: { room: RoomView }) {
             等待 {paused.deciderSeat !== null ? room.players[paused.deciderSeat].nickname : '玩家'} 決定（玩家回來後會自動繼續）…
           </p>
         )}
-        <button className="link" onClick={() => confirm('確定要離開牌局嗎？') && send({ t: 'leaveRoom' })}>
-          離開房間
+        <button className="link" onClick={() => (room.mySeat === null || confirm('確定要離開牌局嗎？')) && send({ t: 'leaveRoom' })}>
+          {room.mySeat === null ? '離開觀戰' : '離開房間'}
         </button>
       </div>
     </div>
@@ -770,9 +779,9 @@ function PauseOverlay({ room }: { room: RoomView }) {
 }
 
 /** 直式上方的狀態列：局數、餘牌、倒數，以及四家的門風、名字與分數（輪到的人亮起） */
-function StatusBar({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
+function StatusBar({ room, game, now, view }: { room: RoomView; game: GameView; now: number; view: number }) {
   const remain = game.deadline && game.phase !== 'result' ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
-  const me = room.mySeat!;
+  const me = view;
   const n = room.players.length;
   // 從自己開始，依下家、對家、上家的順序
   const order = Array.from({ length: n }, (_, i) => room.players[(me + i) % n]);
@@ -788,9 +797,9 @@ function StatusBar({ room, game, now }: { room: RoomView; game: GameView; now: n
         {order.map((p) => {
           const active = game.currentSeat === p.seat && (game.phase === 'turn' || game.phase === 'claim');
           return (
-            <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === me ? 'me' : ''}`}>
+            <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === room.mySeat ? 'me' : ''}`}>
               <b>{windLabel(p.wind)}</b>
-              <span className="nm">{p.seat === me ? '我' : p.nickname}</span>
+              <span className="nm">{p.seat === room.mySeat ? '我' : p.nickname}</span>
               <VoiceMark userId={p.userId} />
               <span className="pt">{p.score}</span>
             </span>
@@ -865,26 +874,31 @@ function useLandscape() {
   return !!landscape;
 }
 
-function Board({ room, game, now, pointKind, overlay, swapMini = true }: {
+function Board({ room, game, now, pointKind, overlay, swapMini = true, view = 0 }: {
   room: RoomView;
   game: GameView;
   now: number;
   pointKind: TileKind | null;
   overlay: ReactElement | null;
+  /** 觀戰視角：坐在下方的座位 */
+  view?: number;
   /** 直式時換三張紀錄改放在上方資訊卡，牌桌上不顯示 */
   swapMini?: boolean;
 }) {
-  const me = room.mySeat!;
+  // 觀戰者沒有座位：以 view 為下方的視角，下方玩家的手牌也以牌背顯示
+  const spectating = room.mySeat === null;
+  const me = room.mySeat ?? view;
   const n = room.players.length;
   return (
     <div className="board">
       <Center room={room} game={game} now={now} />
       <CallOverlay game={game} />
       {overlay}
-      {game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
-      {room.players.map((p) => (
-        <Side key={p.seat} p={p} game={game} pos={positionOf(p.seat, me, n)} pointKind={pointKind} />
-      ))}
+      {spectating ? null : game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
+      {room.players.map((p) => {
+        const pos = positionOf(p.seat, me, n);
+        return <Side key={p.seat} p={p} game={game} pos={pos} pointKind={pointKind} showHand={spectating || pos !== 'bottom'} />;
+      })}
       {room.players.map((p) => (
         <NamePlate key={p.seat} p={p} room={room} game={game} pos={positionOf(p.seat, me, n)} />
       ))}
@@ -909,6 +923,7 @@ export function TableScreen({ state }: { state: AppState }) {
     return () => document.body.classList.remove('in-game');
   }, []);
   if (!game) return <div className="panel narrow">準備下一局…</div>;
+  if (room.mySeat === null) return <SpectatorLayout room={room} game={game} now={now} landscape={landscape} />;
   return <TableLayout room={room} game={game} now={now} pointKind={pointKind} setPointKind={setPointKind} showReco={showReco} setShowReco={setShowReco} landscape={landscape} />;
 }
 
@@ -961,11 +976,60 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   }
   return (
     <div className={`table portrait players-${room.players.length}`}>
-      <StatusBar room={room} game={game} now={now} />
+      <StatusBar room={room} game={game} now={now} view={room.mySeat!} />
       <InfoCard room={room} game={game} tab={tab} setTab={setTab} hint={my.top} />
       <div className="stage">{board}</div>
       {my.hand}
       {my.tools}
+      {modals}
+    </div>
+  );
+}
+
+/** 觀戰：只看公開資訊（河、鳴牌、分數、手牌張數），可以切換坐在下方的視角 */
+function SpectatorLayout({ room, game, now, landscape }: { room: RoomView; game: GameView; now: number; landscape: boolean }) {
+  const [view, setView] = useState(0);
+  const [showYaku, setShowYaku] = useState(false);
+  const n = room.players.length;
+  const board = <Board room={room} game={game} now={now} pointKind={null} overlay={null} swapMini={false} view={view} />;
+  const tools = (
+    <div className="my-tools spectator-tools">
+      <span className="badge spectating">觀戰中</span>
+      <button className="chip-btn" onClick={() => setView((v) => (v + 1) % n)} title="切換坐在下方的玩家">
+        視角：{room.players[view]?.nickname}
+      </button>
+      <button className="chip-btn" onClick={() => setShowYaku(true)}>
+        牌型表
+      </button>
+      <button className="chip-btn" onClick={() => send({ t: 'leaveRoom' })}>
+        離開觀戰
+      </button>
+    </div>
+  );
+  const modals = (
+    <>
+      {game.phase === 'result' && game.result && <ResultModal room={room} game={game} now={now} />}
+      {room.paused && <PauseOverlay room={room} />}
+      {showYaku && <YakuModal room={room} onClose={() => setShowYaku(false)} />}
+    </>
+  );
+  if (landscape) {
+    return (
+      <div className={`table landscape spectator players-${n}`}>
+        <div className="stage">
+          <div className="gutter left">{tools}</div>
+          {board}
+          <div className="gutter right" />
+        </div>
+        {modals}
+      </div>
+    );
+  }
+  return (
+    <div className={`table portrait spectator players-${n}`}>
+      <StatusBar room={room} game={game} now={now} view={view} />
+      <div className="stage">{board}</div>
+      {tools}
       {modals}
     </div>
   );

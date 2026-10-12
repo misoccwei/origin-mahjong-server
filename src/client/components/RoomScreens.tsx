@@ -22,12 +22,23 @@ function rulesSummary(s: RuleSettings) {
     .join('・');
 }
 
+/** 觀戰者名單 */
+function SpectatorList({ room }: { room: RoomView }) {
+  if (!room.spectators.length) return null;
+  return (
+    <p className="muted small">
+      觀戰中（{room.spectators.length}）：{room.spectators.map((s) => s.nickname).join('、')}
+    </p>
+  );
+}
+
 export function WaitingRoom({ room }: { room: RoomView }) {
-  const me = room.mySeat!;
+  const me = room.mySeat;
+  const spectating = me === null;
   const isHost = me === room.hostSeat;
   const [draft, setDraft] = useState(room.settings);
   useEffect(() => setDraft(room.settings), [room.settings]);
-  const myReady = room.players[me]?.ready;
+  const myReady = me !== null && room.players[me]?.ready;
   const full = room.players.every((p) => p.nickname);
   const othersReady = room.players.every((p) => p.seat === room.hostSeat || p.isAI || (p.ready && p.connected));
 
@@ -46,6 +57,7 @@ export function WaitingRoom({ room }: { room: RoomView }) {
           </button>
         </h2>
         <p className="muted">{rulesSummary(room.settings)}</p>
+        {spectating && <p className="spectating-note">你正在觀戰{full ? '' : '，有空位時可以按「入座」加入牌局'}</p>}
         <ul className="seats">
           {room.players.map((p) => (
             <li key={p.seat} className={p.nickname ? '' : 'empty'}>
@@ -72,27 +84,37 @@ export function WaitingRoom({ room }: { room: RoomView }) {
           ))}
         </ul>
         {/* 固定兩欄的格子：某顆按鈕停用時位置不變，其他按鈕不會跟著移動 */}
-        <div className="room-actions">
-          <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? '座位已滿' : undefined}>
-            加入 AI
-          </button>
-          <label className="inline-field">
-            電腦
-            <AILevelSelect value={room.settings.aiLevel} disabled={!isHost} onChange={(level) => send({ t: 'setAILevel', level })} />
-          </label>
-          {isHost ? (
-            <button className="primary" disabled={!full || !othersReady} onClick={() => send({ t: 'start' })}>
-              開始
+        {spectating ? (
+          <div className="room-actions">
+            <button className="primary" disabled={full} onClick={() => send({ t: 'joinRoom', roomId: room.id })} title={full ? '座位已滿' : undefined}>
+              入座
             </button>
-          ) : (
-            <button className={myReady ? '' : 'primary'} onClick={() => send({ t: 'ready', ready: !myReady })}>
-              {myReady ? '取消準備' : '準備'}
+            <button onClick={() => send({ t: 'leaveRoom' })}>離開觀戰</button>
+          </div>
+        ) : (
+          <div className="room-actions">
+            <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? '座位已滿' : undefined}>
+              加入 AI
             </button>
-          )}
-          <button onClick={() => send({ t: 'leaveRoom' })}>離開房間</button>
-        </div>
+            <label className="inline-field">
+              電腦
+              <AILevelSelect value={room.settings.aiLevel} disabled={!isHost} onChange={(level) => send({ t: 'setAILevel', level })} />
+            </label>
+            {isHost ? (
+              <button className="primary" disabled={!full || !othersReady} onClick={() => send({ t: 'start' })}>
+                開始
+              </button>
+            ) : (
+              <button className={myReady ? '' : 'primary'} onClick={() => send({ t: 'ready', ready: !myReady })}>
+                {myReady ? '取消準備' : '準備'}
+              </button>
+            )}
+            <button onClick={() => send({ t: 'leaveRoom' })}>離開房間</button>
+          </div>
+        )}
+        <SpectatorList room={room} />
         <VoicePanel room={room} />
-        <p className="muted small">{isHost ? '人數到齊、其他玩家都準備後即可開始。' : '請按「準備」，由房主開始牌局。'}</p>
+        {!spectating && <p className="muted small">{isHost ? '人數到齊、其他玩家都準備後即可開始。' : '請按「準備」，由房主開始牌局。'}</p>}
       </div>
       <div className="panel">
         <h2>規則設定{!isHost && <span className="muted small">（僅房主可修改）</span>}</h2>
@@ -108,7 +130,7 @@ export function WaitingRoom({ room }: { room: RoomView }) {
 }
 
 export function FinalScreen({ room }: { room: RoomView }) {
-  const me = room.mySeat!;
+  const me = room.mySeat;
   const isHost = me === room.hostSeat;
   const ranking = [...room.players].sort((a, b) => b.score - a.score);
   const hasLeft = room.players.some((p) => p.left);
@@ -130,8 +152,9 @@ export function FinalScreen({ room }: { room: RoomView }) {
           {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>加一圈</button>}
           {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>以 AI 補上空位</button>}
           {isHost && <button onClick={() => send({ t: 'restart' })}>回到房間重新開始</button>}
-          <button onClick={() => send({ t: 'leaveRoom' })}>離開房間</button>
+          <button onClick={() => send({ t: 'leaveRoom' })}>{me === null ? '離開觀戰' : '離開房間'}</button>
         </div>
+        <SpectatorList room={room} />
       </div>
       <div className="panel">
         <h2>各局紀錄</h2>

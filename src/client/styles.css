@@ -476,3 +476,13 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 .voice-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(128, 128, 128, 0.5); flex: none; }
 .voice-dot.speaking { background: #4cd47a; box-shadow: 0 0 0 3px rgba(76, 212, 122, 0.4); }
 .warn-text { color: var(--accent); }
+
+/* ---- 觀戰 ---- */
+.room-list .room-btns { display: flex; gap: 6px; flex: none; }
+.spectating-note { padding: 6px 10px; border-radius: 8px; background: #eef3fb; color: #3c5a8a; }
+.badge.spectating { background: #5a6bb0; font-size: 0.85em; padding: 3px 10px; margin: 0; }
+.table.portrait .spectator-tools { padding-bottom: 8px; }
+.spectator-tools .chip-btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) {
+  .table.portrait .spectator-tools { flex-wrap: wrap; }
+}

@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 // ---- 遊戲行動 ----
 
@@ -153,12 +153,20 @@ export interface RoomView {
   history: HandHistoryEntry[];
   /** 牌局被解散（提前結束） */
   dissolved: boolean;
+  /** 觀戰者（不佔座位） */
+  spectators: { userId: string; nickname: string }[];
 }
 
-/** 大廳的房間列表：還在等待、有空位的房間 */
+/** 大廳的房間列表：等待中有空位（可加入），或允許觀戰的房間 */
 export interface RoomSummary {
   id: string;
   hostName: string;
+  status: 'waiting' | 'playing' | 'finished';
+  /** 等待中且有空位 */
+  joinable: boolean;
+  /** 允許觀戰 */
+  spectatable: boolean;
+  spectators: number;
   /** 已入座人數（含 AI）／總人數 */
   seated: number;
   playerCount: number;
@@ -183,6 +191,8 @@ export type ClientMessage =
   | { t: 'setNickname'; name: string }
   | { t: 'createRoom'; settings?: Partial<RuleSettings> }
   | { t: 'joinRoom'; roomId: string }
+  /** 觀戰：只看公開資訊；等待中有空位時可以再用 joinRoom 入座 */
+  | { t: 'spectate'; roomId: string }
   | { t: 'leaveRoom' }
   | { t: 'updateSettings'; settings: Partial<RuleSettings> }
   | { t: 'addAI' }
