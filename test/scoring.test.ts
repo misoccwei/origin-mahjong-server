@@ -280,10 +280,10 @@ describe('底分與和牌最低分數設定', () => {
     expect(baseScoreFor(s, 1)).toBe(50);
   });
 
-  it('和牌最低分數預設 0，超出範圍時保留原值', () => {
+  it('和牌最低分數預設 20，超出範圍時保留原值', () => {
     const d = defaultSettings(4);
-    expect(d.minWinScore).toBe(0);
+    expect(d.minWinScore).toBe(20);
     expect(sanitizeSettings({ minWinScore: 40 }, d).minWinScore).toBe(40);
-    expect(sanitizeSettings({ minWinScore: 999 }, d).minWinScore).toBe(0);
+    expect(sanitizeSettings({ minWinScore: 999 }, d).minWinScore).toBe(20);
   });
 });

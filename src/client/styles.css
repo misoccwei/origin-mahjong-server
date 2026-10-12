@@ -25,13 +25,19 @@ body { margin: 0; background: var(--bg); min-height: 100vh; }
 body.in-game { overflow: hidden; overscroll-behavior: none; }
 #root { min-height: 100vh; padding: 16px; }
 h1, h2, h3 { margin: 0 0 12px; }
+/* 按鈕：一律指定顏色並關掉原生外觀（iOS Safari 預設會變成淡色字、不顯眼） */
 button {
-  font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #c9c4b5; background: #fff; cursor: pointer;
+  -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  font: inherit; font-weight: 600; line-height: 1.2; color: var(--ink);
+  padding: 9px 16px; border-radius: 10px; border: 1.5px solid #a99f84; background: #ece5d3; cursor: pointer;
+  box-shadow: 0 2px 0 #c9bf9f;
 }
-button:hover:not(:disabled) { background: #f1efe7; }
-button:disabled { opacity: 0.5; cursor: default; }
-button.primary { background: var(--felt); color: #fff; border-color: var(--felt); }
+button:hover:not(:disabled) { background: #e2dac4; }
+button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 #c9bf9f; }
+button:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+button.primary { background: var(--felt); color: #fff; border-color: #0f3a29; box-shadow: 0 2px 0 #0f3a29; }
 button.primary:hover:not(:disabled) { background: var(--felt-dark); }
+button.link { box-shadow: none; }
 button.win { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
 button.link { border: none; background: none; color: #2a6fb0; padding: 4px 8px; }
 input, select { font: inherit; padding: 7px 10px; border: 1px solid #c9c4b5; border-radius: 8px; background: #fff; }
@@ -54,6 +60,12 @@ form input { flex: 1; min-width: 0; }
 .handicap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #ddd; }
 .handicap > span { min-width: 80px; font-weight: 600; }
 
+.room-list { margin-top: 16px; }
+.room-list h3 { font-size: 1em; margin: 0 0 8px; }
+.room-list ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.room-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f2efe5; border: 1px solid #e2dccb; }
+.room-list .room-info { flex: 1; min-width: 0; }
+.room-list .room-host { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room-code { font-family: ui-monospace, monospace; letter-spacing: 0.15em; background: #efeadb; padding: 2px 10px; border-radius: 6px; }
 .seats { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 6px; }
 .seats li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #f2efe5; }
@@ -181,13 +193,19 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .my-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; flex: none; }
 .hint-line { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; color: #dfe9e3; font-size: 0.9em; }
 .my-hand {
-  /* --n = 這一排的張數（摸牌另加間距；橫式時含鳴牌）；張數變少牌就放大。高度也有上限，橫式手機才放得下 */
+  /* --n = 這一排要放的張數（依鳴牌組數固定，摸牌不會改變）；鳴牌越多手牌越少，牌就放大。高度也有上限，橫式手機才放得下 */
   --tw: clamp(20px, min(calc((100vw - 24px) / (var(--n, 14.5) + 1)), 12dvh), 56px);
-  flex: none; display: flex; flex-wrap: wrap; row-gap: 6px; align-items: flex-end; justify-content: center; padding-top: calc(var(--tw) * 0.3);
+  flex: none; display: flex; align-items: flex-end; justify-content: center; gap: calc(var(--tw) * 0.6); padding-top: calc(var(--tw) * 0.3);
 }
-.my-melds { margin-left: calc(var(--tw) * 0.5); display: inline-flex; }
-/* 直式：吃碰的牌另起一排，手牌那排就能用比較大的牌 */
-.table.portrait .my-melds:not(:empty) { flex-basis: 100%; justify-content: center; margin: 4px 0 0; --tw: clamp(18px, calc((100vw - 32px) / 16), 34px); }
+/* 手牌與鳴牌是兩個獨立的區塊，手牌那排不換行 */
+.hand-tiles { display: flex; flex-wrap: nowrap; align-items: flex-end; }
+.meld-area { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: calc(var(--tw) * 0.2); }
+.meld-area .meld { margin-left: 0; }
+.tile-slot.placeholder { width: calc(var(--tw) * 1.06); height: calc(var(--tw) * 4 / 3); }
+/* 直式：鳴牌放在手牌下方另一排，用比較小的牌（不會被選牌時浮出的「打出」按鈕擋住） */
+.table.portrait .my-hand { flex-direction: column; align-items: center; gap: 4px; }
+.table.portrait .meld-area { --tw: clamp(18px, calc((100vw - 32px) / 16), 34px); }
+.chip-btn.think { margin-left: auto; background: #b8461b; border-color: #e67e22; }
 /* 橫式：兩側欄位（左：提示列與工具列；右：推薦牌型） */
 .gutter {
   position: absolute; top: 0; bottom: 0; width: calc((100cqw - var(--S)) / 2 - 12px);
@@ -210,7 +228,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .pass-slots { display: flex; gap: calc(var(--tw) * 0.15); }
 .pass-slot {
   width: calc(var(--tw) * 1.06); height: calc(var(--tw) * 4 / 3 + 4px); padding: 0; border-radius: 6px;
-  border: 2px dashed rgba(255, 255, 255, 0.5); background: transparent; display: inline-flex; align-items: flex-end; justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.5); background: transparent; display: inline-flex; align-items: flex-end; justify-content: center; box-shadow: none;
 }
 .pass-slot.filled { border: none; cursor: pointer; animation: pop 0.15s ease-out; }
 .pass-slot.filled:hover:not(:disabled) { background: transparent; filter: brightness(0.9); }
@@ -250,8 +268,9 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .table.portrait .my-tools { justify-content: center; }
 .chip-btn {
   display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3); color: #f4f1e8; border: 1px solid rgba(255, 255, 255, 0.2); white-space: nowrap;
+  background: rgba(0, 0, 0, 0.35); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.35); white-space: nowrap; box-shadow: none;
 }
+.chip-btn svg { flex: none; }
 .chip-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.45); }
 .chip-btn.on, .chip-btn.on:hover:not(:disabled) { background: var(--gold); border-color: var(--gold); color: #fff; }
 .tools-menu { position: relative; }

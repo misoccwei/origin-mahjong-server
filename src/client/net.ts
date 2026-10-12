@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { PROTOCOL_VERSION, type ClientMessage, type GameAction, type GameView, type RoomView, type ServerMessage } from '../shared/protocol.js';
+import { PROTOCOL_VERSION, type ClientMessage, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
 import { signChallenge } from './identity.js';
 
 export interface AppState {
@@ -13,6 +13,8 @@ export interface AppState {
   clockOffset: number;
   toast: { text: string; id: number } | null;
   fatal: string | null;
+  /** 大廳：等待中的房間列表 */
+  roomList: RoomSummary[];
 }
 
 let state: AppState = {
@@ -25,6 +27,7 @@ let state: AppState = {
   clockOffset: 0,
   toast: null,
   fatal: null,
+  roomList: [],
 };
 const listeners = new Set<() => void>();
 
@@ -88,6 +91,9 @@ export function connect() {
         break;
       case 'error':
         toast(msg.message);
+        break;
+      case 'roomList':
+        set({ roomList: msg.rooms });
         break;
       case 'kicked':
         stopped = true;

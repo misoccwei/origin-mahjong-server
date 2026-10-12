@@ -1,4 +1,4 @@
-import type { GameAction, GameView, PlayerView, RoomView } from '../shared/protocol.js';
+import type { GameAction, GameView, PlayerView, RoomSummary, RoomView } from '../shared/protocol.js';
 import { sanitizeSettings, type AILevel, type RuleSettings } from '../shared/rules.js';
 import { autoAction, decideAction } from './engine/ai.js';
 import type { Rng } from './engine/hand.js';
@@ -57,6 +57,8 @@ export class Room {
   private acks = new Set<number>();
   /** 局結束時主動展示手牌的座位 */
   private shown = new Set<number>();
+  /** 這一局已經用過「長考」的座位 */
+  private thought = new Set<number>();
   private timers: NodeJS.Timeout[] = [];
   private windowId = '';
   private deadline: number | null = null;
@@ -256,6 +258,7 @@ export class Room {
     this.match = new Match(this.settings, { rng: this.deps.rng });
     this.match.startHand();
     this.acks.clear();
+    this.thought.clear();
     this.afterChange();
     return ok;
   }
@@ -340,6 +343,34 @@ export class Room {
     return ok;
   }
 
+  /** 長考：自己的回合把打牌時限延長 60 秒，每局一次 */
+  think(userId: string): RoomResult {
+    const seat = this.seatOf(userId);
+    const hand = this.match?.hand;
+    if (seat < 0 || !hand || this.status !== 'playing' || this.paused) return fail('目前不能長考');
+    if (hand.pending.get(seat)?.kind !== 'turn' || this.deadline === null) return fail('只有自己打牌、而且有時限時才能長考');
+    if (this.thought.has(seat)) return fail('這一局已經長考過了');
+    this.thought.add(seat);
+    this.deadline += 60_000;
+    this.afterChange();
+    return ok;
+  }
+
+  /** 大廳列表用：還在等待、有空位的房間 */
+  summary(): RoomSummary | null {
+    if (this.status !== 'waiting' || this.destroyed) return null;
+    const seated = this.seats.filter(Boolean).length;
+    if (seated >= this.seats.length) return null;
+    return {
+      id: this.id,
+      hostName: this.seats[this.hostSeat]?.nickname ?? '',
+      seated,
+      playerCount: this.settings.playerCount,
+      advanced: this.settings.advanced,
+      scoring: this.settings.scoring,
+    };
+  }
+
   showHand(userId: string): RoomResult {
     const seat = this.seatOf(userId);
     if (seat < 0 || this.match?.hand?.phase !== 'ended') return fail('目前不能展示手牌');
@@ -364,8 +395,9 @@ export class Room {
     this.shown.clear();
     if (m.finished) this.status = 'finished';
     else {
-      // 自動摸打只維持一局
-      for (const s of this.seats) if (s) s.autoPlay = false;
+      // 自動摸打與自動和牌只維持一局
+      for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false);
+      this.thought.clear();
       m.startHand();
     }
     this.afterChange();
@@ -486,7 +518,7 @@ export class Room {
 
   private autoOpts(seat: number) {
     const s = this.seats[seat];
-    return { play: !!s?.autoPlay, win: !!s?.autoWin, onlyMax: !!s?.autoOnlyMax };
+    return { play: !!s?.autoPlay, win: !!s?.autoWin, onlyMax: s?.autoOnlyMax ?? true };
   }
 
   private runAuto(seat: number, wid: string) {
@@ -586,7 +618,9 @@ export class Room {
       passSent: hand.passSent[seat],
       passReceived: hand.passReceived[seat],
       myWaits: hand.waitsFor(seat),
-      auto: { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: !!this.seats[seat]!.autoOnlyMax },
+      auto: { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true },
+      thinkAvailable:
+        !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,
       result: r
         ? {
             kind: r.kind,

@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // ---- 遊戲行動 ----
 
@@ -126,7 +126,9 @@ export interface GameView {
   passReceived: TileId[] | null;
   /** 自己聽牌時所聽的牌與剩餘張數（只計自己看得到的牌） */
   myWaits: { kind: TileKind; left: number }[];
-  /** 自己的自動設定：on = 自動摸打（下一局自動關閉）、win = 自動和牌 */
+  /** 這一局還能按「長考」延長打牌時限（每局一次） */
+  thinkAvailable: boolean;
+  /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者下一局都會自動關閉） */
   auto: { on: boolean; win: boolean; onlyMax: boolean };
   result: HandResultView | null;
   /** 小牌限制：本輪是否還能和小牌 */
@@ -151,6 +153,17 @@ export interface RoomView {
   dissolved: boolean;
 }
 
+/** 大廳的房間列表：還在等待、有空位的房間 */
+export interface RoomSummary {
+  id: string;
+  hostName: string;
+  /** 已入座人數（含 AI）／總人數 */
+  seated: number;
+  playerCount: number;
+  advanced: boolean;
+  scoring: 'additive' | 'zeroSum';
+}
+
 // ---- 訊息 ----
 
 export type ClientMessage =
@@ -165,12 +178,16 @@ export type ClientMessage =
   | { t: 'ready'; ready: boolean }
   /** 房主開始牌局 */
   | { t: 'start' }
-  /** 自動摸打（下一局自動關閉）、自動和牌；onlyMax = 只和這副聽牌的最高分 */
+  /** 自動摸打、自動和牌（下一局都會自動關閉）；onlyMax = 只和這副聽牌的最高分（預設開啟） */
   | { t: 'setAuto'; on: boolean; win: boolean; onlyMax: boolean }
   /** 房主調整電腦難度（等待中或牌局中皆可，立即生效） */
   | { t: 'setAILevel'; level: AILevel }
   /** 局結束時展示自己的手牌 */
   | { t: 'showHand' }
+  /** 長考：自己的回合延長打牌時限 60 秒（每局一次） */
+  | { t: 'think' }
+  /** 取得等待中的房間列表 */
+  | { t: 'listRooms' }
   | { t: 'action'; handNo: number; action: GameAction }
   | { t: 'nextHand' }
   | { t: 'decide'; choice: 'ai' | 'dissolve' }
@@ -185,6 +202,7 @@ export type ServerMessage =
   | { t: 'state'; room: RoomView | null; game: GameView | null; now: number }
   | { t: 'error'; code: string; message: string }
   | { t: 'kicked'; reason: string }
+  | { t: 'roomList'; rooms: RoomSummary[] }
   | { t: 'pong' };
 
 export const AUTH_PREFIX = 'origin-mahjong-auth:';

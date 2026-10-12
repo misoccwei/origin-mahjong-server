@@ -500,7 +500,7 @@ describe('對局', () => {
     expect(r.dissolved).toBe(false);
   });
 
-  it('自動摸打只維持一局（下一局自動關閉），自動和牌持續有效', async () => {
+  it('自動摸打與自動和牌都只維持一局（下一局自動關閉）', async () => {
     const host = await client('AC1');
     host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 0, claimSeconds: 0, passThree: false } });
     await host.waitFor(() => host.room);
@@ -513,7 +513,42 @@ describe('對局', () => {
     host.send({ t: 'nextHand' });
     const g2 = await host.waitFor(() => host.game?.handNo === 2 && host.game);
     expect(g2.auto.on).toBe(false);
-    expect(g2.auto.win).toBe(true);
+    expect(g2.auto.win).toBe(false);
+  });
+
+  it('長考：自己的回合延長 60 秒，每局只能一次', async () => {
+    const host = await client('AD1');
+    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 20, claimSeconds: 10, passThree: false } });
+    await host.waitFor(() => host.room);
+    host.send({ t: 'addAI' });
+    await host.waitFor(() => host.room?.players[1].nickname);
+    host.send({ t: 'start' });
+    const g = await waitMyTurn(host);
+    expect(g.thinkAvailable).toBe(true);
+    expect(g.auto.onlyMax).toBe(true); // 只和最高分預設開啟
+    const before = g.deadline!;
+    host.send({ t: 'think' });
+    const after = await host.waitFor(() => ((host.game?.deadline ?? 0) > before + 50_000 ? host.game : null));
+    expect(after.thinkAvailable).toBe(false);
+    host.send({ t: 'think' });
+    await host.waitFor(() => host.errors.some((e) => e.includes('長考過')));
+  });
+
+  it('大廳房間列表：只列出等待中、有空位的房間與房主名稱', async () => {
+    const host = await client('AE1');
+    host.send({ t: 'createRoom', settings: { playerCount: 2 } });
+    const room = await host.waitFor(() => host.room);
+    const viewer = await client('AE2');
+    viewer.send({ t: 'listRooms' });
+    const list = await viewer.waitFor(() => viewer.messages.find((m) => m.t === 'roomList'));
+    expect(list).toMatchObject({ rooms: expect.arrayContaining([expect.objectContaining({ id: room.id, hostName: 'AE1', seated: 1, playerCount: 2 })]) });
+    // 坐滿之後就不列出
+    host.send({ t: 'addAI' });
+    await host.waitFor(() => host.room?.players[1].nickname);
+    viewer.messages.length = 0;
+    viewer.send({ t: 'listRooms' });
+    const list2 = await viewer.waitFor(() => viewer.messages.find((m) => m.t === 'roomList'));
+    expect(list2 && list2.t === 'roomList' && list2.rooms.some((r) => r.id === room.id)).toBe(false);
   });
 
   it('逾時自動摸切', async () => {

@@ -121,7 +121,7 @@ function buildWall(n: number, startSeat: number, hands: string[], draws: string,
 }
 
 function makeHand(hands: string[], draws: string, opts: Partial<RuleSettings> = {}, rinshan = '') {
-  const settings = { ...defaultSettings(4), passThree: false, ...opts };
+  const settings = { ...defaultSettings(4), minWinScore: 0, passThree: false, ...opts };
   const h = new Hand({ settings, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, draws, rinshan) });
   h.start();
   return h;
@@ -324,7 +324,7 @@ describe('情境', () => {
   it('小牌限制：本輪已和過小牌者不能再和未滿 20 分的牌', () => {
     // 座位 1：234m 678m 333p 456s + 2p 單騎 → 斷么九＋不求人＋一暗刻 = 15 分
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀛🀛🀛🀚🀓🀔🀕', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const settings = { ...defaultSettings(4), advanced: true, smallHandLimit: true, passThree: false };
+    const settings = { ...defaultSettings(4), advanced: true, smallHandLimit: true, passThree: false, minWinScore: 0 };
     const mk = (avail: boolean[]) => {
       const h = new Hand({ settings, startSeat: 0, smallHandAvailable: avail, wall: buildWall(4, 0, hands, '🀚') });
       h.start();
@@ -338,7 +338,7 @@ describe('情境', () => {
 
   it('地和：第一次摸牌前銃和', () => {
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀛🀛🀛🀚🀓🀔🀕', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), advanced: false, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀚') });
+    const h = new Hand({ settings: { ...defaultSettings(4), advanced: false, passThree: false, minWinScore: 0 }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀚') });
     h.start();
     h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀚') });
     h.act(1, { type: 'ron' });
@@ -350,7 +350,7 @@ describe('情境', () => {
   it('自動摸打：摸切、不鳴牌；只和最高分時放過較低分的和牌', () => {
     // 座位 1：234m 678m 456s 33p 55p 對碰。銃和 3p → 該刻子為明刻（10 分）；自摸可多一暗刻（15 分）
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
+    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
     h.start();
     h.drawCount[1] = 1; // 避免成立地和
     expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toEqual({ type: 'discard', tile: h.drawn });
@@ -405,7 +405,7 @@ describe('情境', () => {
 
   it('自動和牌（沒開自動摸打）：只有能和時才自動，其他交給玩家', () => {
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
+    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
     h.start();
     h.drawCount[1] = 1;
     const winOnly = { play: false, win: true, onlyMax: false };

@@ -69,7 +69,8 @@ function game(patch: Partial<GameView> = {}): GameView {
     passSent: null,
     passReceived: null,
     myWaits: [],
-    auto: { on: false, win: false, onlyMax: false },
+    auto: { on: false, win: false, onlyMax: true },
+    thinkAvailable: false,
     result: null,
     smallHandAvailable: [true, true, true, true],
     ...patch,
@@ -77,7 +78,7 @@ function game(patch: Partial<GameView> = {}): GameView {
 }
 
 function render(r: RoomView, g: GameView | null) {
-  const state: AppState = { conn: 'open', authed: true, userId: 'me', nickname: '我', room: r, game: g, clockOffset: 0, toast: null, fatal: null };
+  const state: AppState = { conn: 'open', authed: true, userId: 'me', nickname: '我', room: r, game: g, clockOffset: 0, toast: null, fatal: null, roomList: [] };
   return renderToString(<TableScreen state={state} />);
 }
 
@@ -95,6 +96,23 @@ describe('牌桌畫面', () => {
     expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動摸打/);
     expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和牌/);
     expect(html).toContain('aria-label="更多設定"');
+  });
+
+  it('手牌與鳴牌是分開的區塊；沒有摸牌時保留摸牌位置（摸牌不會讓手牌移動）', () => {
+    const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 0 ? { melds: [{ type: 'pon', tiles: [t(27, 0), t(27, 1), t(27, 2)], calledTile: t(27, 2), from: 1 }] } : {})) });
+    const html = render(r, game({ myHand: HAND.slice(0, 10) }));
+    expect(html).toMatch(/class="hand-tiles"/);
+    expect(html).toMatch(/class="meld-area"/);
+    expect(html).toMatch(/class="tile-slot placeholder"/);
+    // 鳴牌一組：牌的大小以 13 − 3 + 1.5 張計算，與有沒有摸牌無關
+    expect(html).toContain('--n:11.5');
+    const drawn = t(5, 3);
+    expect(render(r, game({ myHand: [...HAND.slice(0, 10), drawn], myDrawn: drawn }))).toContain('--n:11.5');
+  });
+
+  it('長考：可以用時顯示按鈕', () => {
+    expect(render(room(), game({ thinkAvailable: true }))).toContain('長考 +60 秒');
+    expect(render(room(), game())).not.toContain('長考');
   });
 
   it('牌桌固定佔滿畫面：直式用 portrait 版面（伺服器渲染沒有視窗時）', () => {

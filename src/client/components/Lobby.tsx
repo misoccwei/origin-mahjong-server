@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AILevelSelect, NumInput } from './Inputs.js';
 import { DEFAULT_ROUNDS, defaultSettings, type RuleSettings } from '../../shared/rules.js';
 import { send, type AppState } from '../net.js';
@@ -128,6 +128,40 @@ export function SettingsForm({
   );
 }
 
+/** 等待中的房間：每 3 秒更新一次，點一下就加入 */
+function RoomList({ state }: { state: AppState }) {
+  useEffect(() => {
+    const refresh = () => send({ t: 'listRooms' });
+    refresh();
+    const t = setInterval(refresh, 3000);
+    return () => clearInterval(t);
+  }, [state.conn]);
+  return (
+    <div className="room-list">
+      <h3>等待中的房間</h3>
+      {state.roomList.length === 0 ? (
+        <p className="muted small">目前沒有等待中的房間，可以自己建立一個。</p>
+      ) : (
+        <ul>
+          {state.roomList.map((r) => (
+            <li key={r.id}>
+              <div className="room-info">
+                <div className="room-host">{r.hostName} 的房間</div>
+                <div className="muted small">
+                  {r.seated} / {r.playerCount} 人・{r.advanced ? '進階規則' : '基本規則'}・{r.scoring === 'zeroSum' ? '零和式' : '加分式'}・{r.id}
+                </div>
+              </div>
+              <button className="primary" onClick={() => send({ t: 'joinRoom', roomId: r.id })}>
+                加入
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function LobbyScreen({ state }: { state: AppState }) {
   const [settings, setSettings] = useState<RuleSettings>(defaultSettings(4));
   const [code, setCode] = useState('');
@@ -142,10 +176,11 @@ export function LobbyScreen({ state }: { state: AppState }) {
           }}
         >
           <input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="6 位數房號" />
-          <button type="submit" disabled={code.length !== 6}>
+          <button type="submit" className="primary" disabled={code.length !== 6}>
             加入
           </button>
         </form>
+        <RoomList state={state} />
       </div>
       <div className="panel">
         <h2>建立房間</h2>

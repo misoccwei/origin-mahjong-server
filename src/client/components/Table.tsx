@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
 import type { HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
@@ -160,6 +160,16 @@ function Waits({ waits }: { waits: GameView['myWaits'] }) {
 /** ⚙ 選單：較少用的設定（只和最高分、電腦難度、全螢幕、離開），收起來讓工具列在手機上一排放得下 */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 打開時點選單以外的地方就關起來
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
   const [fs, setFs] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
   useEffect(() => {
     const on = () => setFs(!!document.fullscreenElement);
@@ -168,9 +178,14 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
   }, []);
   const canFullscreen = typeof document !== 'undefined' && !!document.fullscreenEnabled;
   return (
-    <div className="tools-menu">
+    <div className="tools-menu" ref={boxRef}>
       <button className={`chip-btn ${open ? 'on' : ''}`} aria-expanded={open} aria-label="更多設定" onClick={() => setOpen((v) => !v)}>
-        ⚙
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.3 7.3 0 0 0-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46a.49.49 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
+          />
+        </svg>
       </button>
       {open && (
         <div className="menu-pop" role="menu">
@@ -281,20 +296,31 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
           ''
         )}
       </div>
+      {game.thinkAvailable && (
+        <button className="chip-btn think" onClick={() => send({ t: 'think' })} title="這一局只能用一次">
+          長考 +60 秒
+        </button>
+      )}
     </div>
   );
 
+  // 牌的大小只依「鳴牌組數」決定（手牌 13 − 3×組數，加上摸牌的位置），摸牌時不會變大小或換行
   const meldTiles = me.melds.reduce((a, m) => a + m.tiles.length + 0.4, 0);
-  const n = hand.length + (game.myDrawn !== null ? 1.5 : 0) + (landscape ? meldTiles : 0);
+  const n = 13 - 3 * me.melds.length + 1.5 + (landscape ? meldTiles * 0.8 : 0);
   const handEl = (
     <div className="my-hand" style={{ '--n': n } as CSSProperties}>
-      {hand.map(tileSlot)}
-      {game.myDrawn !== null && <span className="drawn-gap">{tileSlot(game.myDrawn)}</span>}
-      <span className="my-melds">
-        {me.melds.map((m, i) => (
-          <MeldView key={i} meld={m} />
-        ))}
-      </span>
+      <div className="hand-tiles">
+        {hand.map(tileSlot)}
+        {/* 摸牌的位置一直保留（沒有摸牌時是空位），手牌不會因為摸牌而移動 */}
+        <span className="drawn-gap">{game.myDrawn !== null ? tileSlot(game.myDrawn) : <span className="tile-slot placeholder" aria-hidden="true" />}</span>
+      </div>
+      {me.melds.length > 0 && (
+        <div className="meld-area">
+          {me.melds.map((m, i) => (
+            <MeldView key={i} meld={m} />
+          ))}
+        </div>
+      )}
     </div>
   );
 

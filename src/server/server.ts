@@ -159,6 +159,10 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
 
     const room = u.roomId ? rooms.get(u.roomId) : undefined;
     switch (msg.t) {
+      case 'listRooms': {
+        const list = [...rooms.values()].map((r) => r.summary()).filter((x): x is NonNullable<typeof x> => !!x);
+        return send(c.ws, { t: 'roomList', rooms: list });
+      }
       case 'createRoom': {
         if (room) return send(c.ws, { t: 'error', code: 'room', message: '你已經在房間中' });
         const id = newRoomId();
@@ -199,6 +203,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         return reply(c, room.setAILevel(userId, msg.level));
       case 'showHand':
         return reply(c, room.showHand(userId));
+      case 'think':
+        return reply(c, room.think(userId));
       case 'setAuto':
         return reply(c, room.setAuto(userId, !!msg.on, !!msg.win, !!msg.onlyMax));
       case 'action':
