@@ -1,149 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Hand } from '../src/server/engine/hand.js';
-import { Match } from '../src/server/engine/match.js';
-import { autoAction, decideAction } from '../src/server/engine/ai.js';
-import { defaultSettings, type RuleSettings } from '../src/shared/rules.js';
-import { kindOf, type TileId } from '../src/shared/tiles.js';
-import { uni } from './helpers.js';
+import { Hand } from '../../../src/server/engine/hand.js';
+import { defaultSettings } from '../../../src/shared/rules.js';
+import { kindOf } from '../../../src/shared/tiles.js';
+import { S0, autoplayUntil, buildWall, makeHand, seededRng, tileOf } from '../../support/hand.js';
+import { uni } from '../../support/tiles.js';
 
-function seededRng(seed: number) {
-  let s = seed >>> 0;
-  return (max: number) => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s % max;
-  };
-}
+// 一局的狀態機：用指定的牌山重現各種情境（鳴牌優先順序、搶槓、嶺上、流局、換三張、計分規則等）。
 
-function totalTiles(h: Hand) {
-  return (
-    h.wall.length +
-    h.hands.reduce((a, x) => a + x.length, 0) +
-    h.melds.reduce((a, ms) => a + ms.reduce((b, m) => b + m.tiles.length, 0), 0) +
-    h.discards.reduce((a, ds) => a + ds.filter((d) => !d.called).length, 0) +
-    (h.phase === 'passReveal' ? h.passReceived.reduce((a, r) => a + (r?.length ?? 0), 0) : 0) +
-    (h.kakanPending ? 1 : 0)
-  );
-}
-
-function playHandWithAI(hand: Hand) {
-  let steps = 0;
-  while (hand.phase !== 'ended') {
-    expect(totalTiles(hand)).toBe(136);
-    if (hand.phase === 'passReveal') {
-      hand.completePassReveal();
-      continue;
-    }
-    const [seat] = [...hand.pending.keys()];
-    const err = hand.act(seat, decideAction(hand, seat));
-    expect(err).toBeNull();
-    if (++steps > 2000) throw new Error('hand did not finish');
-  }
-}
-
-function playMatch(settings: RuleSettings, seed: number) {
-  const m = new Match(settings, { rng: seededRng(seed) });
-  while (!m.finished) {
-    const hand = m.startHand();
-    playHandWithAI(hand);
-    m.completeHand();
-  }
-  return m;
-}
-
-describe('AI 對局模擬', () => {
-  const configs: [string, Partial<RuleSettings>][] = [
-    ['4人基本加分式', { advanced: false }],
-    ['4人進階加分式+換三張', { advanced: true, passThree: true }],
-    ['4人進階零和式+小牌限制', { advanced: true, scoring: 'zeroSum', smallHandLimit: true }],
-    ['4人基本零和式', { advanced: false, scoring: 'zeroSum' }],
-    ['4人初學者 AI', { aiLevel: 'beginner' }],
-    ['4人簡單 AI', { aiLevel: 'easy' }],
-    ['4人困難 AI', { aiLevel: 'hard', scoring: 'zeroSum' }],
-  ];
-  for (const [name, extra] of configs) {
-    it(name, () => {
-      for (let seed = 1; seed <= 5; seed++) {
-        const s = { ...defaultSettings(4), ...extra };
-        const m = playMatch(s, seed);
-        expect(m.history.length).toBe(4);
-        if (s.scoring === 'zeroSum') expect(m.scores.reduce((a, b) => a + b, 0)).toBe(0);
-      }
-    });
-  }
-  it('2人、3人', () => {
-    for (const pc of [2, 3] as const) {
-      for (let seed = 1; seed <= 4; seed++) {
-        const s = { ...defaultSettings(pc), advanced: seed % 2 === 0, passThree: true, scoring: seed > 2 ? ('zeroSum' as const) : ('additive' as const) };
-        const m = playMatch(s, seed * 7);
-        expect(m.history.length).toBe(pc * 2);
-        if (s.scoring === 'zeroSum') expect(m.scores.reduce((a, b) => a + b, 0)).toBe(0);
-      }
-    }
-  });
-  it('起始玩家每局輪替、加圈', () => {
-    const m = new Match(defaultSettings(4), { firstStart: 2, rng: seededRng(3) });
-    const starts: number[] = [];
-    while (!m.finished) {
-      starts.push(m.startSeat);
-      playHandWithAI(m.startHand());
-      m.completeHand();
-    }
-    expect(starts).toEqual([2, 3, 0, 1]);
-    m.extend();
-    expect(m.finished).toBe(false);
-    expect(m.totalHands).toBe(8);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 指定牌山的情境測試
-// ---------------------------------------------------------------------------
-
-/**
- * 依各家手牌與摸牌順序組出牌山。
- * hands[seat] 為 13 張；draws 為之後依序摸到的牌；rinshan 為嶺上牌（由尾端取）。
- */
-function buildWall(n: number, startSeat: number, hands: string[], draws: string, rinshan = ''): TileId[] {
-  const used = new Set<TileId>();
-  const take = (k: number) => {
-    for (let i = 0; i < 4; i++) if (!used.has(k * 4 + i)) return used.add(k * 4 + i), k * 4 + i;
-    throw new Error('too many of kind ' + k);
-  };
-  const handTiles = hands.map((h) => uni(h).map(take));
-  const drawTiles = uni(draws).map(take);
-  const rinTiles = uni(rinshan).map(take);
-  const rest: TileId[] = [];
-  for (let id = 0; id < 136; id++) if (!used.has(id)) rest.push(id);
-  const deal: TileId[] = [];
-  for (let r = 0; r < 13; r++) for (let i = 0; i < n; i++) deal.push(handTiles[(startSeat + i) % n][r]);
-  // 牌山尾端放嶺上牌（pop 從最後取）
-  return [...deal, ...drawTiles, ...rest, ...rinTiles.reverse()];
-}
-
-function makeHand(hands: string[], draws: string, opts: Partial<RuleSettings> = {}, rinshan = '') {
-  const settings = { ...defaultSettings(4), minWinScore: 0, passThree: false, ...opts };
-  const h = new Hand({ settings, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, draws, rinshan) });
-  h.start();
-  return h;
-}
-
-const tileOf = (h: Hand, seat: number, ch: string) => h.hands[seat].find((t) => kindOf(t) === uni(ch)[0])!;
-
-/** 輪到誰就打掉摸到的牌、所有鳴牌機會都略過，直到 predicate 成立 */
-function autoplayUntil(h: Hand, predicate: () => boolean, limit = 500) {
-  for (let i = 0; i < limit && !predicate(); i++) {
-    if (h.phase === 'ended') return;
-    if (h.phase === 'passReveal') h.completePassReveal();
-    for (const [seat, avail] of [...h.pending.entries()]) {
-      h.act(seat, avail.kind === 'turn' ? { type: 'discard', tile: h.drawn ?? h.hands[seat][0] } : avail.kind === 'passThree' ? { type: 'passThree', tiles: null } : { type: 'pass' });
-      break;
-    }
-  }
-}
-
-const S0 = '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕';
-
-describe('情境', () => {
+describe('一局（指定牌山）', () => {
   it('碰優先於吃；碰後由碰牌者打牌且不能自摸', () => {
     const h = makeHand([S0, '🀈🀉🀙🀚🀛🀜🀝🀞🀟🀠🀡🀖🀗', '🀇🀇🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀘', '🀊🀋🀌🀍🀎🀏🀙🀚🀛🀜🀝🀞🀟'], '🀇');
     expect(h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀇') })).toBeNull();
@@ -347,20 +211,6 @@ describe('情境', () => {
     expect(h.result!.winners[0].score.total).toBe(180);
   });
 
-  it('自動摸打：摸切、不鳴牌；只和最高分時放過較低分的和牌', () => {
-    // 座位 1：234m 678m 456s 33p 55p 對碰。銃和 3p → 該刻子為明刻（10 分）；自摸可多一暗刻（15 分）
-    const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
-    h.start();
-    h.drawCount[1] = 1; // 避免成立地和
-    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toEqual({ type: 'discard', tile: h.drawn });
-    h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
-    expect(h.pending.get(1)?.ron).toBe(true);
-    expect(h.winPreview(1)).toMatchObject({ score: { total: 10 }, best: 15 });
-    expect(autoAction(h, 1, { play: true, win: false, onlyMax: false })).toEqual({ type: 'ron' });
-    expect(autoAction(h, 1, { play: true, win: false, onlyMax: true })).toEqual({ type: 'pass' });
-  });
-
   it('聽牌提示：聽的牌與剩餘張數（扣掉自己看得到的牌）', () => {
     // 座位 1：234m 678m 456s 33p 55p 對碰 3p／5p
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
@@ -390,37 +240,6 @@ describe('情境', () => {
     expect(mk(20).pending.get(1)?.ron).toBeUndefined();
   });
 
-  it('自動摸打：能暗槓或明槓時停下來交給玩家決定（回傳 null）', () => {
-    // 座位 0 手上三張 🀇、摸到第四張 → 可暗槓
-    const h = makeHand(['🀇🀇🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀚', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀇');
-    expect(h.pending.get(0)?.ankan).toEqual([uni('🀇')[0]]);
-    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toBeNull();
-    // 座位 3 有三張 🀡：座位 2 打出 🀡 時可明槓
-    const h2 = makeHand(['🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀈🀉🀊🀌🀍🀎🀛🀛🀛🀚🀓🀔🀕', '🀡🀇🀇🀈🀈🀉🀉🀙🀚🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀆🀁');
-    autoplayUntil(h2, () => h2.current === 2 && h2.phase === 'turn');
-    h2.act(2, { type: 'discard', tile: tileOf(h2, 2, '🀡') });
-    expect(h2.pending.get(3)?.minkan).toBe(true);
-    expect(autoAction(h2, 3, { play: true, win: false, onlyMax: false })).toBeNull();
-    // 不鳴牌：只能槓（不能和）時自動略過，沒開自動摸打也一樣
-    expect(autoAction(h2, 3, { play: false, win: false, onlyMax: false, noCall: true })).toEqual({ type: 'pass' });
-  });
-
-  it('自動和牌（沒開自動摸打）：只有能和時才自動，其他交給玩家', () => {
-    const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
-    h.start();
-    h.drawCount[1] = 1;
-    const winOnly = { play: false, win: true, onlyMax: false };
-    expect(autoAction(h, 0, winOnly)).toBeNull(); // 輪到自己打牌：不自動
-    h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
-    expect(autoAction(h, 1, winOnly)).toEqual({ type: 'ron' });
-    // 只和最高分：銃和 10 分 < 最高 15 分 → 交給玩家（不自動略過）
-    expect(autoAction(h, 1, { ...winOnly, onlyMax: true })).toBeNull();
-    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false })).toBeNull();
-    // 不鳴牌：能和（也能碰）時不自動略過，交給玩家
-    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false, noCall: true })).toBeNull();
-  });
-
   it('聽牌預計得分：所有聽的牌 × 自摸／銃和的最低與最高；未達和牌最低分數的不列入', () => {
     // 座位 1：234m 678m 456s 33p 55p 對碰。銃和 10 分（明刻），自摸 15 分（多一暗刻）
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
@@ -433,26 +252,3 @@ describe('情境', () => {
     expect(mk(0).waitScore(0)).toBeNull();
   });
 });
-
-describe('AI 依推薦牌型做牌', () => {
-  const others = ['🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-
-  it('換三張：朝清一色／混一色，換掉其他花色的牌', () => {
-    const h = makeHand(['🀙🀚🀛🀜🀝🀞🀟🀠🀡🀆🀆🀈🀙', ...others], '🀁', { passThree: true });
-    const a = decideAction(h, 0, 'normal');
-    expect(a.type).toBe('passThree');
-    const kinds = (a as { tiles: TileId[] }).tiles.map(kindOf);
-    expect(kinds).toHaveLength(3);
-    expect(kinds).toContain(uni('🀈')[0]);
-  });
-
-  it('和牌最低分數高於底分時，打牌朝期望值最高的牌型', () => {
-    // 1～9p＋中中＋2m 3s＋摸 9s：要湊到 40 分，留筒子與中，打掉萬子或索子
-    const h = makeHand(['🀙🀚🀛🀜🀝🀞🀟🀠🀡🀆🀆🀈🀒', ...others], '🀘', { minWinScore: 40 });
-    const a = decideAction(h, 0, 'normal');
-    expect(a.type).toBe('discard');
-    const k = kindOf((a as { tile: TileId }).tile);
-    expect([uni('🀈')[0], uni('🀒')[0], uni('🀘')[0]]).toContain(k);
-  });
-});
-

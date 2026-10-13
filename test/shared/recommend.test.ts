@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { fastestWin, recommendYaku, winProbability } from '../src/shared/recommend.js';
-import { EAST, isHonor, suitOf } from '../src/shared/tiles.js';
-import { meld, uni } from './helpers.js';
+import { fastestWin, recommendYaku, winProbability } from '../../src/shared/recommend.js';
+import { EAST, isHonor, suitOf } from '../../src/shared/tiles.js';
+import { meld, uni } from '../support/tiles.js';
 
 const input = (hand: string, advanced = true, melds = [] as ReturnType<typeof meld>[]) => ({ concealed: uni(hand), melds, seatWind: EAST, advanced });
 const rec = (hand: string, advanced = true, melds = [] as ReturnType<typeof meld>[]) => recommendYaku(input(hand, advanced, melds));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { outcomeRecommend } from '../src/shared/outcome.js';
-import { EAST } from '../src/shared/tiles.js';
-import { uni } from './helpers.js';
+import { outcomeRecommend } from '../../src/shared/outcome.js';
+import { EAST } from '../../src/shared/tiles.js';
+import { uni } from '../support/tiles.js';
 
 const input = (hand: string, extra = {}) => ({ concealed: uni(hand), melds: [], seatWind: EAST, advanced: true, expansion: true, ...extra });
 const k = (s: string) => uni(s)[0];

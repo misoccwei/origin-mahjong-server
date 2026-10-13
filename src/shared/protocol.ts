@@ -7,7 +7,7 @@ import type { TileId, TileKind } from './tiles.js';
 /**
  * 前後端協定版本。改動這個檔案的訊息或快照格式時一定要加一，
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
- * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
+ * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
 export const PROTOCOL_VERSION = 12;
 

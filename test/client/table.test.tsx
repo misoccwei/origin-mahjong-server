@@ -1,0 +1,125 @@
+import { describe, expect, it } from 'vitest';
+import { HAND, game, player, render, room, text, tid } from '../support/snapshots.js';
+
+// 畫面回歸測試：用伺服器會送來的快照直接渲染牌桌，確認各階段都不會丟例外、關鍵內容有出現。
+// （曾發生過結算畫面整個掛掉、換三張顯示錯誤的情況）
+
+describe('牌桌畫面', () => {
+  it('觀戰：沒有手牌與操作，下方玩家也以牌背顯示，可以切換視角與離開觀戰', () => {
+    const r = room({ mySeat: null, players: [0, 1, 2, 3].map((s) => player(s, { userId: s === 0 ? 'p0' : null })) });
+    const html = render(r, game({ myHand: [] }));
+    expect(html).toContain('觀戰中');
+    expect(html).toContain('離開觀戰');
+    expect(html).toContain('視角：');
+    expect(html).not.toContain('推薦牌型');
+    expect(html).not.toContain('自動摸打');
+    // 四家都顯示牌背（下方也是）
+    expect((html.match(/class="side-hand"/g) ?? []).length).toBe(4);
+  });
+
+  it('換三張選牌階段：牌桌上有 3 個候選格與換出／不換', () => {
+    const html = render(room(), game({ phase: 'passThree', pending: { kind: 'passThree' }, waitingSeats: [0] }));
+    expect(html).toMatch(/class="pass-overlay"/);
+    expect((html.match(/class="pass-slot"/g) ?? []).length).toBe(3);
+    expect(html).toMatch(/<button class="call pon" disabled="">換出<\/button>/);
+    expect(html).toContain('不換');
+  });
+
+  it('工具列：推薦牌型、自動和牌、自動摸打（開啟時高亮）與 ⚙ 選單', () => {
+    const html = render(room(), game({ auto: { on: true, win: false, onlyMax: false, noCall: false } }));
+    expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動摸打/);
+    expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和牌/);
+    expect(html).toContain('aria-label="更多設定"');
+  });
+
+  it('手牌與鳴牌是分開的區塊；沒有摸牌時保留摸牌位置（摸牌不會讓手牌移動）', () => {
+    const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 0 ? { melds: [{ type: 'pon', tiles: [tid(27, 0), tid(27, 1), tid(27, 2)], calledTile: tid(27, 2), from: 1 }] } : {})) });
+    const html = render(r, game({ myHand: HAND.slice(0, 10) }));
+    expect(html).toMatch(/class="hand-tiles"/);
+    expect(html).toMatch(/class="meld-area"/);
+    expect(html).toMatch(/class="tile-slot placeholder"/);
+    // 鳴牌一組：牌的大小以 13 − 3 + 1.5 張計算，與有沒有摸牌無關
+    expect(html).toContain('--n:11.5');
+    const drawn = tid(5, 3);
+    expect(render(r, game({ myHand: [...HAND.slice(0, 10), drawn], myDrawn: drawn }))).toContain('--n:11.5');
+  });
+
+  it('長考：可以用時顯示按鈕', () => {
+    expect(render(room(), game({ thinkAvailable: true }))).toContain('長考 +60 秒');
+    expect(render(room(), game())).not.toContain('長考');
+  });
+
+  it('直式：上方狀態列（局數、四家分數，輪到的人亮起）與資訊卡分頁', () => {
+    const html = render(room(), game({ currentSeat: 1, deadline: Date.now() + 9500 }));
+    expect(html).toMatch(/class="status-bar"/);
+    expect(text(html)).toContain('第 1 / 4 局');
+    expect(html).toMatch(/class="score-chip active "[^>]*><b>南<\/b><span class="nm">電腦 1<\/span>/);
+    expect(html).toMatch(/class="info-card"/);
+    expect(html).toContain('輪到 電腦 1 打牌');
+    // 沒有換三張紀錄時不顯示該分頁；推薦牌型不再疊在牌桌上
+    expect(html).not.toMatch(/role="tab"[^>]*>換三張/);
+    expect(html).not.toContain('reco-panel overlay');
+  });
+
+  it('直式：有換三張紀錄時多一個分頁，牌桌上不再顯示換三張紀錄', () => {
+    const html = render(room(), game({ passSent: HAND.slice(0, 3), passReceived: [tid(30), tid(31), tid(32)] }));
+    expect(html).toMatch(/role="tab"[^>]*>換三張/);
+    expect(html).not.toContain('swap-mini');
+  });
+
+  it('牌桌固定佔滿畫面：直式用 portrait 版面（伺服器渲染沒有視窗時）', () => {
+    expect(render(room(), game())).toMatch(/class="table portrait players-4"/);
+  });
+
+  it('換三張亮牌：有交換時顯示換出與收到的牌與倒數，不會顯示「沒有換到牌」', () => {
+    const html = render(
+      room(),
+      game({ phase: 'passReveal', myHand: HAND.slice(3), passSent: HAND.slice(0, 3), passReceived: [tid(30), tid(31), tid(32)], deadline: Date.now() + 2500 }),
+    );
+    expect(html).toContain('換出');
+    expect(html).toContain('收到');
+    expect(html).not.toContain('沒有換到牌');
+    expect(html).toMatch(/swap-count[^>]*>3</);
+  });
+
+  it('換三張亮牌：沒有交換時顯示「沒有換到牌」', () => {
+    expect(render(room(), game({ phase: 'passReveal', deadline: Date.now() + 2500 }))).toContain('這次沒有換到牌');
+  });
+
+
+  it('剛打出的牌顯示在中央，鳴牌時加上標記', () => {
+    const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 1 ? { discards: [{ tile: tid(22), called: false }] } : {})) });
+    const html = render(r, game({ phase: 'claim', currentSeat: 1, lastDiscard: { seat: 1, tile: tid(22) }, recentDiscard: { seat: 1, tile: tid(22) }, pending: { kind: 'claim', pon: true } }));
+    expect(html).toMatch(/class="recent claiming"/);
+    expect(text(html)).toContain('電腦 1 打出');
+    expect(html).toContain('碰');
+    // 吃碰槓和是疊在牌桌上的大按鈕
+    expect(html).toMatch(/class="call-overlay"/);
+    expect(html).toMatch(/class="call pon"/);
+  });
+
+  it('可以和牌時顯示醒目的和牌按鈕', () => {
+    const html = render(room(), game({ phase: 'claim', currentSeat: 1, recentDiscard: { seat: 1, tile: tid(27) }, pending: { kind: 'claim', ron: true, pon: true } }));
+    expect(html).toMatch(/class="call win"[^>]*>和</);
+  });
+
+  it('自動摸打遇到能槓時，問玩家要不要槓（有「不槓（摸切）」）', () => {
+    const drawn = tid(0, 3);
+    const g = game({ myHand: [...HAND, drawn], myDrawn: drawn, auto: { on: true, win: false, onlyMax: false, noCall: false }, pending: { kind: 'turn', discard: [...HAND, drawn], ankan: [0] } });
+    const html = render(room(), g);
+    expect(html).toContain('暗槓');
+    expect(html).toContain('不槓（摸切）');
+    // 沒開自動摸打時不需要這顆按鈕（直接打牌就是不槓）
+    expect(render(room(), { ...g, auto: { on: false, win: false, onlyMax: false, noCall: false } })).not.toContain('不槓');
+  });
+
+  it('聽牌時在手牌上方顯示聽的牌、剩餘張數與預計得分（同分只寫一個）', () => {
+    const html = render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 20, max: 45 } }));
+    expect(html).toContain('聽牌：');
+    expect(text(html)).toContain('×3');
+    expect(html).toContain('預計 20～45 分');
+    expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 40, max: 40 } }))).toContain('預計 40 分');
+    expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: null }))).toContain('未達和牌最低分數');
+  });
+
+});

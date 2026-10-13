@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { YAKU, evaluateWin } from '../src/shared/scoring.js';
-import { YAKU_INFO } from '../src/shared/yakuInfo.js';
-import { meld, uni } from './helpers.js';
+import { YAKU, evaluateWin } from '../../src/shared/scoring.js';
+import { YAKU_INFO } from '../../src/shared/yakuInfo.js';
+import { meld, uni } from '../support/tiles.js';
 
 // 牌型表的資料與計分程式一致：每個牌型都有說明，每個牌例都真的會計到該牌型
 describe('牌型表', () => {

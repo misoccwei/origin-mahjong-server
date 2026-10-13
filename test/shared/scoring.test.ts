@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateWin, bestTenpaiScore, scoreByWait, waitingKinds } from '../src/shared/scoring.js';
-import { settle } from '../src/shared/settlement.js';
-import { baseScoreFor, defaultSettings, sanitizeSettings, type Meld } from '../src/shared/rules.js';
-import { WEST, EAST } from '../src/shared/tiles.js';
-import { meld, uni } from './helpers.js';
+import { evaluateWin, bestTenpaiScore, scoreByWait, waitingKinds } from '../../src/shared/scoring.js';
+import type { Meld } from '../../src/shared/rules.js';
+import { WEST, EAST } from '../../src/shared/tiles.js';
+import { meld, uni } from '../support/tiles.js';
 
 interface Case {
   hand: string;
@@ -309,78 +308,6 @@ describe('聽牌最高分的和法', () => {
     expect(r.waits).toContain(r.tile);
     expect(r.score.total).toBe(15);
     expect(r.score.yaku.map((y) => y.name)).toContain('一暗刻');
-  });
-});
-
-describe('結算', () => {
-  const win = (total: number, yakuPoints: number, seat: number, tsumo: boolean, from?: number) => ({
-    seat,
-    tsumo,
-    from,
-    score: { form: 'standard' as const, groups: [], yaku: [], yakuPoints, limit: false, baseScore: total - yakuPoints, total },
-  });
-
-  it('加分式基本：和牌者得和牌分數', () => {
-    const s = { ...defaultSettings(4), advanced: false };
-    expect(settle(s, [win(105, 85, 0, false, 1)], []).deltas).toEqual([105, 0, 0, 0]);
-  });
-
-  it('加分式進階：和牌×2，聽牌得分不超過和牌者的得分（和牌分數×2）', () => {
-    const s = { ...defaultSettings(4), advanced: true };
-    const r = settle(s, [win(15, 15, 0, false, 1)], [{ seat: 2, maxScore: 95 }, { seat: 3, maxScore: 20 }]);
-    expect(r.deltas).toEqual([30, 0, 30, 20]);
-  });
-
-  it('加分式進階：流局時聽牌得分不設限', () => {
-    const s = { ...defaultSettings(4), advanced: true };
-    expect(settle(s, [], [{ seat: 2, maxScore: 95 }]).deltas).toEqual([0, 0, 95, 0]);
-  });
-
-  it('加分式進階：唯一和牌者 0 分時不結算', () => {
-    const s = { ...defaultSettings(4), advanced: true };
-    expect(settle(s, [win(0, 0, 0, false, 1)], [{ seat: 2, maxScore: 95 }]).deltas).toEqual([0, 0, 0, 0]);
-  });
-
-  it('零和式基本：60 分銃和，非放銃者各付 40，放銃者付 100', () => {
-    const s = { ...defaultSettings(4), advanced: false, scoring: 'zeroSum' as const };
-    expect(settle(s, [win(60, 40, 0, false, 1)], []).deltas).toEqual([180, -100, -40, -40]);
-  });
-
-  it('零和式基本：60 分自摸，各付 60', () => {
-    const s = { ...defaultSettings(4), advanced: false, scoring: 'zeroSum' as const };
-    expect(settle(s, [win(60, 40, 0, true)], []).deltas).toEqual([180, -60, -60, -60]);
-  });
-
-  it('零和式進階：15 分銃和各家分付；85 分銃和放銃者包付 215', () => {
-    const s = { ...defaultSettings(4), scoring: 'zeroSum' as const, advanced: true };
-    expect(settle(s, [win(15, 15, 0, false, 1)], []).deltas).toEqual([45, -15, -15, -15]);
-    expect(settle(s, [win(85, 85, 2, false, 1)], []).deltas).toEqual([-20, -215, 255, -20]);
-  });
-
-  it('零和式 3 人、2 人', () => {
-    const s3 = { ...defaultSettings(3), advanced: false, scoring: 'zeroSum' as const };
-    expect(settle(s3, [win(60, 40, 0, false, 1)], []).deltas).toEqual([120, -80, -40]);
-    const s2 = { ...defaultSettings(2), advanced: false, scoring: 'zeroSum' as const };
-    expect(settle(s2, [win(60, 40, 0, false, 1)], []).deltas).toEqual([60, -60]);
-  });
-});
-
-describe('底分與和牌最低分數設定', () => {
-  it('底分依規則預設，可在讓分中逐人設定', () => {
-    const d = defaultSettings(4);
-    expect(d.advanced).toBe(true);
-    expect(baseScoreFor(d, 0)).toBe(0);
-    expect(baseScoreFor({ ...d, advanced: false }, 0)).toBe(20);
-    const s = sanitizeSettings({ handicaps: { 1: { baseScore: 50 } } }, d);
-    expect(baseScoreFor(s, 0)).toBe(0);
-    expect(baseScoreFor(s, 1)).toBe(50);
-  });
-
-  it('和牌最低分數預設 20，超出範圍時保留原值', () => {
-    const d = defaultSettings(4);
-    expect(d.minWinScore).toBe(20);
-    expect(sanitizeSettings({ minWinScore: 40 }, d).minWinScore).toBe(40);
-    expect(sanitizeSettings({ minWinScore: 999 }, d).minWinScore).toBe(20);
   });
 });
 

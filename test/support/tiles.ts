@@ -1,5 +1,5 @@
-import type { Meld } from '../src/shared/rules.js';
-import type { TileKind } from '../src/shared/tiles.js';
+import type { Meld } from '../../src/shared/rules.js';
+import type { TileKind } from '../../src/shared/tiles.js';
 
 /** 將 Unicode 麻將字元（🀀-🀡）轉為 TileKind */
 export function uni(s: string): TileKind[] {
