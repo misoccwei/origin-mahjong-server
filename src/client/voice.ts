@@ -1,5 +1,6 @@
 // 房間語音：WebRTC P2P mesh（最多 4 人）。伺服器只轉送 signaling（net.ts 的 rtc 訊息）。
 // 生命週期：房間開始牌局時開啟，直到離開房間（或房間關閉）才關閉；牌局結束回到等待畫面時仍保持。
+// 麥克風預設關閉：開啟語音時只收聽，玩家按下麥克風按鈕時才向瀏覽器要權限。
 import { t } from './i18n/index.js';
 import { useSyncExternalStore } from 'react';
 import type { RoomView, RtcSignal } from '../shared/protocol.js';
@@ -52,7 +53,7 @@ function savePrefs() {
 
 const initial = (): VoiceState => {
   const p = typeof localStorage === 'undefined' ? { deviceId: '', ptt: false, muted: {} } : loadPrefs();
-  return { active: false, micOn: true, speakerOn: true, ptt: p.ptt, pttDown: false, mic: 'unknown', devices: [], deviceId: p.deviceId, speaking: {}, peerMic: {}, muted: p.muted, needGesture: false };
+  return { active: false, micOn: false, speakerOn: true, ptt: p.ptt, pttDown: false, mic: 'unknown', devices: [], deviceId: p.deviceId, speaking: {}, peerMic: {}, muted: p.muted, needGesture: false };
 };
 
 let state: VoiceState = initial();
@@ -324,7 +325,7 @@ async function flush(p: Peer) {
 // ---- 生命週期 ----
 
 async function start() {
-  set({ ...initial(), active: true, micOn: true, speakerOn: true });
+  set({ ...initial(), active: true, speakerOn: true });
   if (!supported()) {
     set({ mic: 'none', micOn: false });
     toast(t('這個瀏覽器不支援語音（需要 HTTPS 或 localhost）'));
@@ -345,7 +346,7 @@ async function start() {
   }
   void audioCtx?.resume().catch(() => {});
   startMeter();
-  if (!(await acquireMic()) && state.active) toast(t(state.mic === 'denied' ? '無法使用麥克風（未授權），目前只能收聽' : '找不到麥克風，目前只能收聽'));
+  await listDevices();
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);
   window.addEventListener('blur', releasePtt);
@@ -455,7 +456,8 @@ export function setPttDown(down: boolean) {
 export async function setDevice(id: string) {
   set({ deviceId: id });
   savePrefs();
-  if (state.active) await acquireMic(id);
+  // 還沒開過麥克風時只記下選擇，等按下麥克風按鈕才要權限
+  if (state.active && state.mic === 'ok') await acquireMic(id);
 }
 
 export function togglePeerMute(id: string) {

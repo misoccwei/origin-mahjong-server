@@ -289,8 +289,6 @@ export const en: Record<string, string> = {
   '設定': 'Settings',
   '麥克風 {n}': 'Microphone {n}',
   '這個瀏覽器不支援語音（需要 HTTPS 或 localhost）': 'Voice chat is not supported here (needs HTTPS or localhost)',
-  '無法使用麥克風（未授權），目前只能收聽': 'Microphone not allowed; listening only',
-  '找不到麥克風，目前只能收聽': 'No microphone found; listening only',
   '無法使用麥克風：請在瀏覽器網址列允許麥克風權限': 'Microphone blocked: allow it in the address bar',
 
   // ---- Hand list ----
