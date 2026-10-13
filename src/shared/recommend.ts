@@ -308,7 +308,13 @@ export function buildTargets(input: RecommendInput): Target[] {
   return targets;
 }
 
-export function recommendYaku(input: RecommendInput, limit = 5): Recommendation[] {
+interface Ranked {
+  target: Target;
+  rec: Recommendation;
+}
+
+/** 每個牌型（含同一牌型的不同花色）的牌效率與期望值，依期望值排序 */
+function rankTargets(input: RecommendInput): Ranked[] {
   const { concealed, melds } = input;
   const counts = countKinds(concealed);
   const meldKinds = melds.map((m) => m.tiles.map(kindOf));
@@ -318,37 +324,90 @@ export function recommendYaku(input: RecommendInput, limit = 5): Recommendation[
   const draws = input.drawsLeft ?? 12;
   const baseScore = input.baseScore ?? 0;
   const minWin = input.minWinScore ?? 0;
+  const std: Evaluator = (c) => shantenStandard(c, melds.length);
+  const base = efficiency([...counts], std, visible, drawn).shanten;
 
-  const results = new Map<string, Recommendation>();
+  const out: Ranked[] = [];
   for (const t of buildTargets(input)) {
     const def = YAKU[t.id];
     if (minWin > 0 && def.points + baseScore < minWin) continue;
     const e = efficiency([...counts], t.evaluate, visible, drawn);
-    if (!Number.isFinite(e.shanten)) continue;
+    if (!Number.isFinite(e.shanten) || e.shanten > base + 3) continue;
     const winRate = winProbability(e.shanten, e.ukeire, unseen, draws, t.callable, input.playerCount);
-    const r: Recommendation = {
-      id: t.id,
-      name: def.name,
-      points: def.points,
-      shanten: e.shanten,
-      ukeire: e.ukeire,
-      discard: 'discard' in e ? e.discard : undefined,
-      callable: t.callable,
-      winRate,
-      ev: winRate * (def.points + baseScore),
-    };
-    // 同一牌型（例如三種花色的清一色）只留期望值最高的
-    const prev = results.get(t.id);
-    if (!prev || r.ev > prev.ev || (r.ev === prev.ev && (r.shanten < prev.shanten || (r.shanten === prev.shanten && r.ukeire > prev.ukeire)))) results.set(t.id, r);
+    out.push({
+      target: t,
+      rec: {
+        id: t.id,
+        name: def.name,
+        points: def.points,
+        shanten: e.shanten,
+        ukeire: e.ukeire,
+        discard: 'discard' in e ? e.discard : undefined,
+        callable: t.callable,
+        winRate,
+        ev: winRate * (def.points + baseScore),
+      },
+    });
   }
-
   // 排序：期望值。期望值相同（例如都幾乎不可能）時看向聽數、有效牌與分數
-  const std: Evaluator = (c) => shantenStandard(c, melds.length);
-  const base = efficiency([...counts], std, visible, drawn).shanten;
-  return [...results.values()]
-    .filter((r) => r.shanten <= base + 3)
-    .sort((a, b) => b.ev - a.ev || a.shanten - b.shanten || b.ukeire - a.ukeire || b.points - a.points)
-    .slice(0, limit);
+  return out.sort((a, b) => b.rec.ev - a.rec.ev || a.rec.shanten - b.rec.shanten || b.rec.ukeire - a.rec.ukeire || b.rec.points - a.rec.points);
+}
+
+export function recommendYaku(input: RecommendInput, limit = 5): Recommendation[] {
+  // 同一牌型（例如三種花色的清一色）只留期望值最高的
+  const seen = new Set<string>();
+  const out: Recommendation[] = [];
+  for (const { rec } of rankTargets(input)) {
+    if (seen.has(rec.id)) continue;
+    seen.add(rec.id);
+    out.push(rec);
+  }
+  return out.slice(0, limit);
+}
+
+/** 依序比較，第一個不同的值比較小 */
+function lexLess(a: number[], b: number[]) {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
+
+/**
+ * 換三張：以期望值最高的牌型為目標，一張一張挑出對它最沒用的牌
+ * （拿掉後目標牌型的向聽數最小、有效牌最多；同分時看一般形的向聽數）。
+ */
+export function suggestPass(input: RecommendInput, count = 3): TileKind[] {
+  const counts = countKinds(input.concealed);
+  const meldKinds = input.melds.map((m) => m.tiles.map(kindOf));
+  const visible = input.visible ?? countKinds([...input.concealed, ...meldKinds.flat()]);
+  const std: Evaluator = (c) => shantenStandard(c, input.melds.length);
+  const goal = rankTargets(input)[0]?.target.evaluate ?? std;
+  const ukeireOf = (evaluate: Evaluator, s: number) => {
+    let total = 0;
+    for (let k = 0; k < KIND_COUNT; k++) {
+      const left = 4 - visible[k];
+      if (left <= 0) continue;
+      counts[k]++;
+      if (evaluate(counts) < s) total += left;
+      counts[k]--;
+    }
+    return total;
+  };
+  const out: TileKind[] = [];
+  for (let i = 0; i < count; i++) {
+    let best: { k: TileKind; key: number[] } | null = null;
+    for (let k = 0; k < KIND_COUNT; k++) {
+      if (!counts[k]) continue;
+      counts[k]--;
+      const g = goal(counts);
+      const key = [g, -ukeireOf(goal, g), std(counts)];
+      counts[k]++;
+      if (!best || lexLess(key, best.key)) best = { k, key };
+    }
+    if (!best) break;
+    out.push(best.k);
+    counts[best.k]--;
+  }
+  return out;
 }
 
 /** 純牌效率（不看牌型）：最快和牌的向聽數、有效牌與建議打的牌 */

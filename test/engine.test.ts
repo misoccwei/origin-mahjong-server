@@ -429,3 +429,26 @@ describe('情境', () => {
     expect(mk(0).waitScore(0)).toBeNull();
   });
 });
+
+describe('AI 依推薦牌型做牌', () => {
+  const others = ['🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
+
+  it('換三張：朝清一色／混一色，換掉其他花色的牌', () => {
+    const h = makeHand(['🀙🀚🀛🀜🀝🀞🀟🀠🀡🀆🀆🀈🀙', ...others], '🀁', { passThree: true });
+    const a = decideAction(h, 0, 'normal');
+    expect(a.type).toBe('passThree');
+    const kinds = (a as { tiles: TileId[] }).tiles.map(kindOf);
+    expect(kinds).toHaveLength(3);
+    expect(kinds).toContain(uni('🀈')[0]);
+  });
+
+  it('和牌最低分數高於底分時，打牌朝期望值最高的牌型', () => {
+    // 1～9p＋中中＋2m 3s＋摸 9s：要湊到 40 分，留筒子與中，打掉萬子或索子
+    const h = makeHand(['🀙🀚🀛🀜🀝🀞🀟🀠🀡🀆🀆🀈🀒', ...others], '🀘', { minWinScore: 40 });
+    const a = decideAction(h, 0, 'normal');
+    expect(a.type).toBe('discard');
+    const k = kindOf((a as { tile: TileId }).tile);
+    expect([uni('🀈')[0], uni('🀒')[0], uni('🀘')[0]]).toContain(k);
+  });
+});
+

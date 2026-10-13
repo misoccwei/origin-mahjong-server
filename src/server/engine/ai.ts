@@ -1,5 +1,6 @@
 import type { GameAction } from '../../shared/protocol.js';
-import type { AILevel } from '../../shared/rules.js';
+import { recommendYaku, suggestPass, type RecommendInput } from '../../shared/recommend.js';
+import { baseScoreFor, type AILevel, type Meld } from '../../shared/rules.js';
 import { shanten } from '../../shared/shanten.js';
 import { KIND_COUNT, isDragon, isHonor, isTerminal, kindOf, suitOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import type { Hand } from './hand.js';
@@ -7,6 +8,10 @@ import type { Hand } from './hand.js';
 // AI：以向聽數與有效牌數決定打牌，並帶有少量牌型傾向（番牌、混／清一色）。
 // 只使用該座位看得到的資訊（自己的手牌、所有人的捨牌與鳴牌）。
 // 難度：beginner 大多亂打；easy 只看向聽數且偶爾亂打、不鳴牌；normal 為基本策略；hard 另外會避開危險牌（防守）。
+// normal／hard 會以推薦牌型中期望值最高的牌型為目標：
+// - 和牌最低分數高於底分（要靠牌型才能和）時，打牌以朝目標牌型為優先，鳴牌也只在鳴了之後期望值變高時才鳴；
+//   沒有限制時只在向聽數相同的牌之間偏向目標牌型。
+// - 換三張依目標牌型挑出最沒用的 3 張。
 
 function countsOf(tiles: TileId[]): number[] {
   const c = new Array(KIND_COUNT).fill(0);
@@ -47,7 +52,28 @@ interface Ctx {
   /** 打出某種牌的危險度（0～1），hard 才有 */
   danger?: (k: TileKind) => number;
   dangerWeight?: number;
+  /** 朝目標牌型建議打的牌與偏好的權重 */
+  targetDiscard?: TileKind;
+  targetWeight?: number;
 }
+
+function recInput(ctx: Ctx, concealed: TileId[], melds: Meld[]): RecommendInput {
+  const { hand, seat } = ctx;
+  return {
+    concealed: concealed.map(kindOf),
+    melds,
+    seatWind: ctx.seatWind,
+    advanced: ctx.advanced,
+    visible: ctx.visible,
+    drawsLeft: Math.floor(Math.max(0, hand.wallRemaining - hand.deadWall) / hand.n),
+    playerCount: hand.n,
+    baseScore: baseScoreFor(hand.settings, seat),
+    minWinScore: hand.settings.minWinScore,
+  };
+}
+
+/** 和牌最低分數高於底分：一定要湊到牌型才能和 */
+const needsYaku = (ctx: Ctx) => ctx.hand.settings.minWinScore > baseScoreFor(ctx.hand.settings, ctx.seat);
 
 function ukeire(counts: number[], ctx: Ctx, current: number): number {
   let total = 0;
@@ -93,6 +119,7 @@ function bestDiscard(tiles: TileId[], ctx: Ctx): { tile: TileId; shanten: number
     counts[k]++;
     let score = -s * 1000 + u * 4 - (simple ? 0 : tileValue(k, counts, ctx, lean));
     if (ctx.danger && ctx.dangerWeight) score -= ctx.danger(k) * ctx.dangerWeight;
+    if (k === ctx.targetDiscard) score += ctx.targetWeight ?? 0;
     if (!best || score > best.score) best = { tile: t, score, shanten: s };
   }
   return best!;
@@ -169,12 +196,12 @@ export function decideAction(hand: Hand, seat: number, level: AILevel = hand.set
   }
 
   if (avail.kind === 'passThree') {
+    // 依目標牌型挑出最沒用的 3 張
     const rest = [...tiles];
     const out: TileId[] = [];
-    for (let i = 0; i < 3; i++) {
-      const { tile } = bestDiscard(rest, { ...ctx, meldCount: 0 });
-      out.push(tile);
-      rest.splice(rest.indexOf(tile), 1);
+    for (const k of suggestPass(recInput(ctx, tiles, []))) {
+      const i = rest.findIndex((t) => kindOf(t) === k);
+      out.push(rest.splice(i, 1)[0]);
     }
     return { type: 'passThree', tiles: out };
   }
@@ -192,6 +219,12 @@ export function decideAction(hand: Hand, seat: number, level: AILevel = hand.set
       const c = [...counts];
       c[k]--;
       if (shanten(c, ctx.meldCount, advanced) <= current) return { type: 'kakan', kind: k };
+    }
+    // 朝期望值最高的牌型打：有和牌最低分數限制時優先於向聽數，否則只在向聽數相同時偏向它
+    const plan = recommendYaku(recInput(ctx, tiles, hand.melds[seat]), 1)[0];
+    if (plan?.discard !== undefined) {
+      ctx.targetDiscard = plan.discard;
+      ctx.targetWeight = needsYaku(ctx) ? 1500 : 300;
     }
     return { type: 'discard', tile: bestDiscard(tiles, ctx).tile };
   }
@@ -214,6 +247,22 @@ export function decideAction(hand: Hand, seat: number, level: AILevel = hand.set
     return bestDiscard(rest, { ...ctx, meldCount: ctx.meldCount + 1 }).shanten;
   };
   const worthCalling = (s: number) => s < current && (!advanced || yakuhai || leaningFlush);
+
+  // 要靠牌型才能和：鳴了之後期望值（和牌率 × 分數）變高才鳴
+  if (needsYaku(ctx)) {
+    const melds = hand.melds[seat];
+    const before = recommendYaku(recInput(ctx, tiles, melds), 1)[0];
+    const better = (type: Meld['type'], remove: TileId[]) => {
+      const meld: Meld = { type, tiles: [...remove, discard].sort((a, b) => a - b), calledTile: discard, from: hand.lastDiscard!.seat };
+      const after = recommendYaku(recInput(ctx, tiles.filter((t) => !remove.includes(t)), [...melds, meld]), 1)[0];
+      return !!after && (!before || after.ev > before.ev);
+    };
+    const same = tiles.filter((t) => kindOf(t) === k);
+    if (avail.minkan && better('minkan', same.slice(0, 3))) return { type: 'minkan' };
+    if (avail.pon && better('pon', same.slice(0, 2))) return { type: 'pon' };
+    for (const option of avail.chi ?? []) if (better('chi', option)) return { type: 'chi', tiles: option };
+    return { type: 'pass' };
+  }
 
   if (avail.minkan) {
     const c = [...counts];
