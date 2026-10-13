@@ -1,5 +1,6 @@
 // 房間語音：WebRTC P2P mesh（最多 4 人）。伺服器只轉送 signaling（net.ts 的 rtc 訊息）。
 // 生命週期：房間開始牌局時開啟，直到離開房間（或房間關閉）才關閉；牌局結束回到等待畫面時仍保持。
+import { t } from './i18n/index.js';
 import { useSyncExternalStore } from 'react';
 import type { RoomView, RtcSignal } from '../shared/protocol.js';
 import { rtcListeners, send, toast } from './net.js';
@@ -149,7 +150,7 @@ function startMeter() {
 async function listDevices() {
   try {
     const all = await navigator.mediaDevices.enumerateDevices();
-    const devices = all.filter((d) => d.kind === 'audioinput' && d.deviceId).map((d, i) => ({ id: d.deviceId, label: d.label || `麥克風 ${i + 1}` }));
+    const devices = all.filter((d) => d.kind === 'audioinput' && d.deviceId).map((d, i) => ({ id: d.deviceId, label: d.label || t('麥克風 {n}', { n: i + 1 }) }));
     set({ devices });
   } catch {
     /* 忽略 */
@@ -326,7 +327,7 @@ async function start() {
   set({ ...initial(), active: true, micOn: true, speakerOn: true });
   if (!supported()) {
     set({ mic: 'none', micOn: false });
-    toast('這個瀏覽器不支援語音（需要 HTTPS 或 localhost）');
+    toast(t('這個瀏覽器不支援語音（需要 HTTPS 或 localhost）'));
     return;
   }
   try {
@@ -344,7 +345,7 @@ async function start() {
   }
   void audioCtx?.resume().catch(() => {});
   startMeter();
-  if (!(await acquireMic()) && state.active) toast(state.mic === 'denied' ? '無法使用麥克風（未授權），目前只能收聽' : '找不到麥克風，目前只能收聽');
+  if (!(await acquireMic()) && state.active) toast(t(state.mic === 'denied' ? '無法使用麥克風（未授權），目前只能收聽' : '找不到麥克風，目前只能收聽'));
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);
   window.addEventListener('blur', releasePtt);
@@ -425,7 +426,7 @@ export async function toggleMic() {
   if (!state.active) return;
   if (state.mic !== 'ok') {
     set({ micOn: true });
-    if (!(await acquireMic())) toast(state.mic === 'denied' ? '無法使用麥克風：請在瀏覽器網址列允許麥克風權限' : '找不到麥克風');
+    if (!(await acquireMic())) toast(t(state.mic === 'denied' ? '無法使用麥克風：請在瀏覽器網址列允許麥克風權限' : '找不到麥克風'));
     return;
   }
   set({ micOn: !state.micOn });

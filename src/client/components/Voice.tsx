@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { RoomView } from '../../shared/protocol.js';
 import { useAppState } from '../net.js';
 import { setDevice, setPtt, setPttDown, toggleMic, togglePeerMute, toggleSpeaker, useVoice } from '../voice.js';
+import { playerName, t } from '../i18n/index.js';
 
 const MicIcon = ({ off }: { off?: boolean }) => (
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -28,13 +29,13 @@ export function VoiceButtons() {
       <button
         className={`chip-btn icon voice-mic ${micLive ? 'on' : ''} ${micLive && !!me && v.speaking[me] ? 'speaking' : ''}`}
         aria-pressed={micLive}
-        aria-label={micLive ? '關閉麥克風' : '開啟麥克風'}
-        title={v.mic === 'denied' ? '麥克風未授權' : v.mic === 'none' ? '找不到麥克風' : micLive ? '麥克風開啟' : '麥克風關閉'}
+        aria-label={micLive ? t('關閉麥克風') : t('開啟麥克風')}
+        title={v.mic === 'denied' ? t('麥克風未授權') : v.mic === 'none' ? t('找不到麥克風') : micLive ? t('麥克風開啟') : t('麥克風關閉')}
         onClick={() => void toggleMic()}
       >
         <MicIcon off={!micLive} />
       </button>
-      <button className={`chip-btn icon ${v.speakerOn ? 'on' : ''}`} aria-pressed={v.speakerOn} aria-label={v.speakerOn ? '關閉喇叭' : '開啟喇叭'} title={v.speakerOn ? '喇叭開啟' : '喇叭關閉'} onClick={toggleSpeaker}>
+      <button className={`chip-btn icon ${v.speakerOn ? 'on' : ''}`} aria-pressed={v.speakerOn} aria-label={v.speakerOn ? t('關閉喇叭') : t('開啟喇叭')} title={v.speakerOn ? t('喇叭開啟') : t('喇叭關閉')} onClick={toggleSpeaker}>
         <SpeakerIcon off={!v.speakerOn} />
       </button>
       {v.ptt && (
@@ -45,7 +46,7 @@ export function VoiceButtons() {
           onPointerCancel={() => setPttDown(false)}
           onContextMenu={(e) => e.preventDefault()}
         >
-          按住說話
+          {t('按住說話')}
         </button>
       )}
     </>
@@ -61,7 +62,7 @@ export function VoiceMark({ userId }: { userId: string | null }) {
   const muted = !!v.muted[userId];
   if (!speaking && !off && !muted) return null;
   return (
-    <span className={`voice-mark ${speaking ? 'speaking' : ''}`} title={muted ? '已被你靜音' : off ? '麥克風關閉' : '說話中'} aria-label={muted ? '已靜音' : off ? '麥克風關閉' : '說話中'}>
+    <span className={`voice-mark ${speaking ? 'speaking' : ''}`} title={muted ? t('已被你靜音') : off ? t('麥克風關閉') : t('說話中')} aria-label={muted ? t('已靜音') : off ? t('麥克風關閉') : t('說話中')}>
       {muted ? <SpeakerIcon off /> : off ? <MicIcon off /> : <MicIcon />}
     </span>
   );
@@ -71,16 +72,16 @@ export function VoiceMark({ userId }: { userId: string | null }) {
 export function VoiceSettings({ room }: { room: RoomView }) {
   const v = useVoice();
   const userId = useAppState().userId;
-  if (!v.active) return <p className="muted small">語音會在牌局開始時開啟，直到離開房間。</p>;
+  if (!v.active) return <p className="muted small">{t('語音會在牌局開始時開啟，直到離開房間。')}</p>;
   const others = room.players.filter((p) => p.userId && !p.isAI && p.userId !== userId);
   return (
     <div className="voice-settings">
-      {v.mic === 'denied' && <p className="small warn-text">麥克風未授權，目前只能收聽。請在瀏覽器網址列允許麥克風權限後，按麥克風按鈕重試。</p>}
-      {v.mic === 'none' && <p className="small warn-text">找不到麥克風，目前只能收聽。</p>}
+      {v.mic === 'denied' && <p className="small warn-text">{t('麥克風未授權，目前只能收聽。請在瀏覽器網址列允許麥克風權限後，按麥克風按鈕重試。')}</p>}
+      {v.mic === 'none' && <p className="small warn-text">{t('找不到麥克風，目前只能收聽。')}</p>}
       <label className="toggle row">
-        麥克風
+        {t('麥克風')}
         <select value={v.deviceId} disabled={v.devices.length === 0} onChange={(e) => void setDevice(e.target.value)}>
-          {v.devices.length === 0 && <option value="">（無）</option>}
+          {v.devices.length === 0 && <option value="">{t('（無）')}</option>}
           {v.devices.map((d) => (
             <option key={d.id} value={d.id}>
               {d.label}
@@ -90,17 +91,17 @@ export function VoiceSettings({ room }: { room: RoomView }) {
       </label>
       <label className="toggle">
         <input type="checkbox" checked={v.ptt} onChange={(e) => setPtt(e.target.checked)} />
-        按鍵說話（按住 V 鍵或畫面上的按鈕）
+        {t('按鍵說話（按住 V 鍵或畫面上的按鈕）')}
       </label>
       <ul className="voice-peers">
-        {others.length === 0 && <li className="muted small">房間裡沒有其他真人玩家</li>}
+        {others.length === 0 && <li className="muted small">{t('房間裡沒有其他真人玩家')}</li>}
         {others.map((p) => (
           <li key={p.seat}>
             <span className={`voice-dot ${v.speaking[p.userId!] ? 'speaking' : ''}`} />
-            <span className="nm">{p.nickname}</span>
-            {v.peerMic[p.userId!] === false && <span className="muted small">麥克風關閉</span>}
+            <span className="nm">{playerName(p)}</span>
+            {v.peerMic[p.userId!] === false && <span className="muted small">{t('麥克風關閉')}</span>}
             <button className={`link ${v.muted[p.userId!] ? 'on' : ''}`} onClick={() => togglePeerMute(p.userId!)}>
-              {v.muted[p.userId!] ? '取消靜音' : '靜音'}
+              {v.muted[p.userId!] ? t('取消靜音') : t('靜音')}
             </button>
           </li>
         ))}
@@ -117,12 +118,12 @@ export function VoicePanel({ room }: { room: RoomView }) {
   return (
     <div className="voice-panel">
       <div className="voice-panel-head">
-        <b>語音</b>
+        <b>{t('語音')}</b>
         <span className="voice-btns">
           <VoiceButtons />
         </span>
         <button className="link" onClick={() => setOpen((x) => !x)}>
-          {open ? '收起' : '設定'}
+          {open ? t('收起') : t('設定')}
         </button>
       </div>
       {open && <VoiceSettings room={room} />}

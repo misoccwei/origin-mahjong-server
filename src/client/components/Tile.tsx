@@ -1,9 +1,9 @@
-import { WHITE, kindOf, numOf, suitOf, tileName, type TileId, type TileKind } from '../../shared/tiles.js';
+import { WHITE, kindOf, numOf, suitOf, type TileId, type TileKind } from '../../shared/tiles.js';
 
 // 牌面圖：FluffyStuff/riichi-mahjong-tiles（CC0），放在 public/tiles
 const HONOR_FILES = ['Ton', 'Nan', 'Shaa', 'Pei', 'Chun', 'Hatsu', 'Haku'];
 
-export const kindLabel = tileName;
+import { tileLabel } from '../i18n/index.js';
 
 export function faceUrl(k: TileKind) {
   const name = k < 27 ? ['Man', 'Pin', 'Sou'][suitOf(k)] + numOf(k) : HONOR_FILES[k - 27];
@@ -47,10 +47,10 @@ export function Tile(p: Props) {
       onClick={p.onClick}
       onMouseEnter={p.onMouseEnter}
       onMouseLeave={p.onMouseLeave}
-      title={p.title ?? kindLabel(k)}
+      title={p.title ?? tileLabel(k)}
       role={p.onClick ? 'button' : undefined}
     >
-      <img src={faceUrl(k)} alt={kindLabel(k)} draggable={false} />
+      <img src={faceUrl(k)} alt={tileLabel(k)} draggable={false} />
     </span>
   );
 }

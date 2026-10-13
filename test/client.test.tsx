@@ -11,6 +11,9 @@ import { defaultSettings } from '../src/shared/rules.js';
 
 const t = (kind: number, copy = 0) => kind * 4 + copy;
 
+/** 看得到的文字：去掉標籤與 React 伺服器渲染插入的 <!-- --> 分隔，連續空白壓成一個 */
+const text = (html: string) => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
 function player(seat: number, patch: Partial<PlayerView> = {}): PlayerView {
   return {
     seat,
@@ -134,7 +137,7 @@ describe('牌桌畫面', () => {
   it('直式：上方狀態列（局數、四家分數，輪到的人亮起）與資訊卡分頁', () => {
     const html = render(room(), game({ currentSeat: 1, deadline: Date.now() + 9500 }));
     expect(html).toMatch(/class="status-bar"/);
-    expect(html).toContain('第 <!-- -->1<!-- --> / <!-- -->4<!-- --> 局');
+    expect(text(html)).toContain('第 1 / 4 局');
     expect(html).toMatch(/class="score-chip active "[^>]*><b>南<\/b><span class="nm">電腦 1<\/span>/);
     expect(html).toMatch(/class="info-card"/);
     expect(html).toContain('輪到 電腦 1 打牌');
@@ -174,7 +177,7 @@ describe('牌桌畫面', () => {
     const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 1 ? { discards: [{ tile: t(22), called: false }] } : {})) });
     const html = render(r, game({ phase: 'claim', currentSeat: 1, lastDiscard: { seat: 1, tile: t(22) }, recentDiscard: { seat: 1, tile: t(22) }, pending: { kind: 'claim', pon: true } }));
     expect(html).toMatch(/class="recent claiming"/);
-    expect(html).toContain('電腦 1<!-- --> 打出');
+    expect(text(html)).toContain('電腦 1 打出');
     expect(html).toContain('碰');
     // 吃碰槓和是疊在牌桌上的大按鈕
     expect(html).toMatch(/class="call-overlay"/);
@@ -199,7 +202,7 @@ describe('牌桌畫面', () => {
   it('聽牌時在手牌上方顯示聽的牌、剩餘張數與預計得分（同分只寫一個）', () => {
     const html = render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 20, max: 45 } }));
     expect(html).toContain('聽牌：');
-    expect(html).toContain('×<!-- -->3');
+    expect(text(html)).toContain('×3');
     expect(html).toContain('預計 20～45 分');
     expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 40, max: 40 } }))).toContain('預計 40 分');
     expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: null }))).toContain('未達和牌最低分數');
@@ -258,12 +261,12 @@ describe('結算畫面', () => {
 
   it('聽牌者顯示得分最高的和法與牌型（聽牌得分依此計算）', () => {
     const html = render(room(), game({ phase: 'result', result: baseResult }));
-    expect(html).toContain('最高分的和法：<!-- -->自摸<!-- -->「<!-- -->九萬<!-- -->」');
+    expect(text(html)).toContain('最高分的和法：自摸「九萬」');
     expect(html).toContain('二暗刻');
     expect(html).toContain('五門齊');
     expect(html).toContain('最高和牌分數');
     // 實得 5 分 < 最高 40 分：說明被和牌者的分數限制
-    expect(html).toContain('實得 <!-- -->5<!-- --> 分');
+    expect(text(html)).toContain('實得 5 分');
   });
 
   it('展示過手牌後列在「展示手牌」區', () => {
@@ -291,7 +294,7 @@ describe('牌型表', () => {
     expect(html).toContain('十三不搭');
     expect(html).toContain('對稱類');
     expect(html).toContain('任何分數');
-    expect(html).toMatch(/共 <!-- -->76<!-- --> 個牌型/);
+    expect(text(html)).toContain('共 76 個牌型');
   });
 
   it('牌局中預設只列出這桌適用的牌型', () => {

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { PROTOCOL_VERSION, type ClientMessage, type RtcSignal, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
 import { signChallenge } from './identity.js';
+import { t } from './i18n/index.js';
 
 export interface AppState {
   conn: 'connecting' | 'open' | 'closed';
@@ -73,7 +74,7 @@ export function connect() {
         if (msg.protocol !== PROTOCOL_VERSION) {
           // 舊伺服器配新網頁（或反過來）時格式不合，畫面會壞掉；直接停下來提示
           stopped = true;
-          set({ fatal: `伺服器版本（v${msg.protocol}）與網頁版本（v${PROTOCOL_VERSION}）不一致，請重新啟動伺服器後再重新整理頁面。` });
+          set({ fatal: t('伺服器版本（v{server}）與網頁版本（v{client}）不一致，請重新啟動伺服器後再重新整理頁面。', { server: msg.protocol, client: PROTOCOL_VERSION }) });
           ws?.close();
           return;
         }
@@ -94,7 +95,8 @@ export function connect() {
         set({ room: msg.room, game: msg.game, clockOffset: msg.now - Date.now() });
         break;
       case 'error':
-        toast(msg.message);
+        // 伺服器的錯誤訊息是固定的中文字串，依目前語言翻譯
+        toast(t(msg.message));
         break;
       case 'rtc':
         rtcListeners.forEach((l) => l(msg.from, msg.data));

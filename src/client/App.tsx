@@ -4,14 +4,17 @@ import { TableScreen } from './components/Table.js';
 import { useEffect } from 'react';
 import { useAppState } from './net.js';
 import { syncVoice } from './voice.js';
+import { t, useLang } from './i18n/index.js';
 
 export function App() {
   const state = useAppState();
+  // 切換語言時整個畫面重新渲染
+  useLang();
   // 語音跟著房間：開始牌局時開啟、離開房間時關閉（切換畫面不會中斷）
   useEffect(() => syncVoice(state.room, state.userId), [state.room, state.userId]);
   let body;
-  if (state.fatal) body = <div className="panel narrow"><h2>無法連線</h2><p>{state.fatal}</p></div>;
-  else if (!state.authed) body = <div className="panel narrow">連線中…</div>;
+  if (state.fatal) body = <div className="panel narrow"><h2>{t('無法連線')}</h2><p>{t(state.fatal)}</p></div>;
+  else if (!state.authed) body = <div className="panel narrow">{t('連線中…')}</div>;
   else if (!state.nickname) body = <NicknameScreen state={state} />;
   else if (!state.room) body = <LobbyScreen state={state} />;
   else if (state.room.status === 'waiting') body = <WaitingRoom room={state.room} />;
@@ -19,7 +22,7 @@ export function App() {
   else body = <TableScreen state={state} />;
   return (
     <>
-      {state.conn !== 'open' && state.authed === false && state.nickname && <div className="banner">重新連線中…</div>}
+      {state.conn !== 'open' && state.authed === false && state.nickname && <div className="banner">{t('重新連線中…')}</div>}
       {body}
       {state.toast && <div className="toast" key={state.toast.id}>{state.toast.text}</div>}
     </>

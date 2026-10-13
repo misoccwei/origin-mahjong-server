@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import type { RoomView } from '../../shared/protocol.js';
 import type { RuleSettings } from '../../shared/rules.js';
 import { send, toast } from '../net.js';
-import { AI_LEVEL_LABEL, AILevelSelect } from './Inputs.js';
-import { SettingsForm } from './Lobby.js';
+import { aiLevelLabel, AILevelSelect } from './Inputs.js';
+import { LangSelect, SettingsForm } from './Lobby.js';
+import { playerName, t, tn } from '../i18n/index.js';
 import { VoicePanel } from './Voice.js';
 import { ExportButton } from './ExportButton.js';
 import { renderFinal, renderHandResult } from '../exportImage.js';
@@ -11,19 +12,19 @@ import { ResultBody } from './Table.js';
 
 function rulesSummary(s: RuleSettings) {
   return [
-    `${s.playerCount} 人`,
-    `${s.rounds} 圈（${s.rounds * s.playerCount} 局）`,
-    s.advanced ? '進階規則' : '基本規則',
-    s.expansion && '牌型擴充包',
-    s.scoring === 'zeroSum' ? '零和式' : '加分式',
-    s.minWinScore > 0 && `最低 ${s.minWinScore} 分`,
-    `電腦${AI_LEVEL_LABEL[s.aiLevel]}`,
-    s.passThree && '換三張',
-    s.randomSeats && '隨機座位',
-    s.smallHandLimit && '小牌限制',
+    t('{n} 人', { n: s.playerCount }),
+    t('{rounds} 圈（{hands} 局）', { rounds: s.rounds, hands: s.rounds * s.playerCount }),
+    s.advanced ? t('進階規則') : t('基本規則'),
+    s.expansion && t('牌型擴充包'),
+    s.scoring === 'zeroSum' ? t('零和式') : t('加分式'),
+    s.minWinScore > 0 && t('最低 {n} 分', { n: s.minWinScore }),
+    t('電腦{level}', { level: aiLevelLabel(s.aiLevel) }),
+    s.passThree && t('換三張'),
+    s.randomSeats && t('隨機座位'),
+    s.smallHandLimit && t('小牌限制'),
   ]
     .filter(Boolean)
-    .join('・');
+    .join(t('・'));
 }
 
 /** 觀戰者名單 */
@@ -31,7 +32,8 @@ function SpectatorList({ room }: { room: RoomView }) {
   if (!room.spectators.length) return null;
   return (
     <p className="muted small">
-      觀戰中（{room.spectators.length}）：{room.spectators.map((s) => s.nickname).join('、')}
+      {t('觀戰中（{n}）：', { n: room.spectators.length })}
+      {room.spectators.map((s) => s.nickname).join(t('、'))}
     </p>
   );
 }
@@ -50,18 +52,18 @@ export function WaitingRoom({ room }: { room: RoomView }) {
     <div className="lobby">
       <div className="panel">
         <h2>
-          房號 <span className="room-code">{room.id}</span>
+          {tn('房號 {id}', { id: <span className="room-code">{room.id}</span> })}
           <button
             className="link"
             onClick={() => {
-              navigator.clipboard?.writeText(room.id).then(() => toast('已複製房號'));
+              navigator.clipboard?.writeText(room.id).then(() => toast(t('已複製房號')));
             }}
           >
-            複製
+            {t('複製')}
           </button>
         </h2>
         <p className="muted">{rulesSummary(room.settings)}</p>
-        {spectating && <p className="spectating-note">你正在觀戰{full ? '' : '，有空位時可以按「入座」加入牌局'}</p>}
+        {spectating && <p className="spectating-note">{full ? t('你正在觀戰') : t('你正在觀戰，有空位時可以按「入座」加入牌局')}</p>}
         <ul className="seats">
           {room.players.map((p) => (
             <li key={p.seat} className={p.nickname ? '' : 'empty'}>
@@ -69,20 +71,20 @@ export function WaitingRoom({ room }: { room: RoomView }) {
               {p.nickname ? (
                 <>
                   <span className="name">
-                    {p.nickname}
-                    {p.seat === room.hostSeat && <span className="badge">房主</span>}
+                    {playerName(p)}
+                    {p.seat === room.hostSeat && <span className="badge">{t('房主')}</span>}
                     {p.isAI && <span className="badge ai">AI</span>}
-                    {!p.connected && <span className="badge warn">離線</span>}
+                    {!p.connected && <span className="badge warn">{t('離線')}</span>}
                   </span>
-                  {p.seat !== room.hostSeat && <span className={p.ready ? 'ready yes' : 'ready'}>{p.ready ? '已準備' : '未準備'}</span>}
+                  {p.seat !== room.hostSeat && <span className={p.ready ? 'ready yes' : 'ready'}>{p.ready ? t('已準備') : t('未準備')}</span>}
                   {isHost && p.seat !== me && (
                     <button className="link" onClick={() => send({ t: 'removeSeat', seat: p.seat })}>
-                      移除
+                      {t('移除')}
                     </button>
                   )}
                 </>
               ) : (
-                <span className="muted">等待玩家加入…</span>
+                <span className="muted">{t('等待玩家加入…')}</span>
               )}
             </li>
           ))}
@@ -90,42 +92,46 @@ export function WaitingRoom({ room }: { room: RoomView }) {
         {/* 固定兩欄的格子：某顆按鈕停用時位置不變，其他按鈕不會跟著移動 */}
         {spectating ? (
           <div className="room-actions">
-            <button className="primary" disabled={full} onClick={() => send({ t: 'joinRoom', roomId: room.id })} title={full ? '座位已滿' : undefined}>
-              入座
+            <button className="primary" disabled={full} onClick={() => send({ t: 'joinRoom', roomId: room.id })} title={full ? t('座位已滿') : undefined}>
+              {t('入座')}
             </button>
-            <button onClick={() => send({ t: 'leaveRoom' })}>離開觀戰</button>
+            <button onClick={() => send({ t: 'leaveRoom' })}>{t('離開觀戰')}</button>
           </div>
         ) : (
           <div className="room-actions">
-            <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? '座位已滿' : undefined}>
-              加入 AI
+            <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? t('座位已滿') : undefined}>
+              {t('加入 AI')}
             </button>
             <label className="inline-field">
-              電腦
+              {t('電腦')}
               <AILevelSelect value={room.settings.aiLevel} disabled={!isHost} onChange={(level) => send({ t: 'setAILevel', level })} />
             </label>
             {isHost ? (
               <button className="primary" disabled={!full || !othersReady} onClick={() => send({ t: 'start' })}>
-                開始
+                {t('開始')}
               </button>
             ) : (
               <button className={myReady ? '' : 'primary'} onClick={() => send({ t: 'ready', ready: !myReady })}>
-                {myReady ? '取消準備' : '準備'}
+                {myReady ? t('取消準備') : t('準備')}
               </button>
             )}
-            <button onClick={() => send({ t: 'leaveRoom' })}>離開房間</button>
+            <button onClick={() => send({ t: 'leaveRoom' })}>{t('離開房間')}</button>
           </div>
         )}
         <SpectatorList room={room} />
         <VoicePanel room={room} />
-        {!spectating && <p className="muted small">{isHost ? '人數到齊、其他玩家都準備後即可開始。' : '請按「準備」，由房主開始牌局。'}</p>}
+        <LangSelect />
+        {!spectating && <p className="muted small">{isHost ? t('人數到齊、其他玩家都準備後即可開始。') : t('請按「準備」，由房主開始牌局。')}</p>}
       </div>
       <div className="panel">
-        <h2>規則設定{!isHost && <span className="muted small">（僅房主可修改）</span>}</h2>
-        <SettingsForm value={draft} onChange={setDraft} disabled={!isHost} seatNames={room.players.map((p) => p.nickname)} showAILevel={false} />
+        <h2>
+          {t('規則設定')}
+          {!isHost && <span className="muted small">{t('（僅房主可修改）')}</span>}
+        </h2>
+        <SettingsForm value={draft} onChange={setDraft} disabled={!isHost} seatNames={room.players.map((p) => (p.nickname ? playerName(p) : null))} showAILevel={false} />
         {isHost && (
           <button className="primary" disabled={JSON.stringify(draft) === JSON.stringify(room.settings)} onClick={() => send({ t: 'updateSettings', settings: draft })}>
-            套用設定
+            {t('套用設定')}
           </button>
         )}
       </div>
@@ -141,29 +147,29 @@ export function FinalScreen({ room }: { room: RoomView }) {
   return (
     <div className="lobby">
       <div className="panel">
-        <h2>{room.dissolved ? '牌局已解散' : '最終結算'}</h2>
+        <h2>{room.dissolved ? t('牌局已解散') : t('最終結算')}</h2>
         <ol className="ranking">
           {ranking.map((p, i) => (
             <li key={p.seat} className={p.seat === me ? 'me' : ''}>
               <span className="rank">{i + 1}</span>
-              <span className="name">{p.nickname}</span>
+              <span className="name">{playerName(p)}</span>
               <span className="score">{p.score}</span>
             </li>
           ))}
         </ol>
         <VoicePanel room={room} />
         <div className="row">
-          {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>加一圈</button>}
-          {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>以 AI 補上空位</button>}
-          {isHost && <button onClick={() => send({ t: 'restart' })}>回到房間重新開始</button>}
-          <ExportButton render={() => renderFinal(room)} filename={`原點麻將-${room.id}-結算.png`} />
-          <button onClick={() => send({ t: 'leaveRoom' })}>{me === null ? '離開觀戰' : '離開房間'}</button>
+          {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>{t('加一圈')}</button>}
+          {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>{t('以 AI 補上空位')}</button>}
+          {isHost && <button onClick={() => send({ t: 'restart' })}>{t('回到房間重新開始')}</button>}
+          <ExportButton render={() => renderFinal(room)} filename={`mahjong-${room.id}-final.png`} />
+          <button onClick={() => send({ t: 'leaveRoom' })}>{me === null ? t('離開觀戰') : t('離開房間')}</button>
         </div>
         <SpectatorList room={room} />
       </div>
       <div className="panel">
-        <h2>各局紀錄</h2>
-        {room.replays.length > 0 && <p className="muted small">點一局可以重看那一局的結果。</p>}
+        <h2>{t('各局紀錄')}</h2>
+        {room.replays.length > 0 && <p className="muted small">{t('點一局可以重看那一局的結果。')}</p>}
         <HistoryTable room={room} />
       </div>
     </div>
@@ -187,21 +193,21 @@ function ReplayModal({ room, handNo, setHandNo }: { room: RoomView; handNo: numb
       <div className="modal result">
         <div className="reco-head">
           <strong>
-            第 {handNo} / {total} 局
+            {t('第 {n} / {total} 局', { n: handNo, total })}
           </strong>
-          <button className="link" onClick={() => setHandNo(null)} aria-label="關閉">✕</button>
+          <button className="link" onClick={() => setHandNo(null)} aria-label={t('關閉')}>✕</button>
         </div>
         <ResultBody room={room} r={replay.result} totals={totals} live={false} />
         <div className="result-actions">
           <button disabled={!prev} onClick={() => prev && setHandNo(prev.handNo)}>
-            上一局
+            {t('上一局')}
           </button>
           <button disabled={!next} onClick={() => next && setHandNo(next.handNo)}>
-            下一局
+            {t('下一局')}
           </button>
           <ExportButton
             render={() => renderHandResult(room, { handNo, totalHands: total, result: replay.result, totals })}
-            filename={`原點麻將-${room.id}-第${handNo}局.png`}
+            filename={`mahjong-${room.id}-hand${handNo}.png`}
           />
         </div>
       </div>
@@ -210,7 +216,7 @@ function ReplayModal({ room, handNo, setHandNo }: { room: RoomView; handNo: numb
 }
 
 export function HistoryTable({ room }: { room: RoomView }) {
-  const names = room.players.map((p) => p.nickname ?? '-');
+  const names = room.players.map((p) => (p.nickname ? playerName(p) : '-'));
   const [viewing, setViewing] = useState<number | null>(null);
   const canReplay = (handNo: number) => room.replays.some((x) => x.handNo === handNo);
   return (
@@ -219,8 +225,8 @@ export function HistoryTable({ room }: { room: RoomView }) {
       <table className="history">
         <thead>
           <tr>
-            <th>局</th>
-            <th>結果</th>
+            <th>{t('局')}</th>
+            <th>{t('結果')}</th>
             {names.map((n, i) => (
               <th key={i}>{n}</th>
             ))}
@@ -232,14 +238,21 @@ export function HistoryTable({ room }: { room: RoomView }) {
               key={h.handNo}
               className={canReplay(h.handNo) ? 'replayable' : ''}
               onClick={canReplay(h.handNo) ? () => setViewing(h.handNo) : undefined}
-              title={canReplay(h.handNo) ? '重看這一局' : undefined}
+              title={canReplay(h.handNo) ? t('重看這一局') : undefined}
             >
               <td>{h.handNo}</td>
               <td className="left">
                 {h.kind === 'draw'
-                  ? '流局'
+                  ? t('流局')
                   : h.winners
-                      .map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : `銃和（${names[w.from!]}）`} ${w.total}分 ${w.yaku.join('・')}`)
+                      .map((w) =>
+                        t(w.tsumo ? '{name} 自摸 {total}分 {yaku}' : '{name} 銃和（{from}） {total}分 {yaku}', {
+                          name: names[w.seat],
+                          from: names[w.from!] ?? '',
+                          total: w.total,
+                          yaku: w.yaku.map((y) => t(y)).join(t('・')),
+                        }),
+                      )
                       .join(' / ')}
               </td>
               {h.deltas.map((d, i) => (
@@ -252,7 +265,7 @@ export function HistoryTable({ room }: { room: RoomView }) {
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={2}>合計</td>
+            <td colSpan={2}>{t('合計')}</td>
             {room.players.map((p) => (
               <td key={p.seat}>{p.score}</td>
             ))}

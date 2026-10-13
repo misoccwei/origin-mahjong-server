@@ -7,15 +7,16 @@ import { baseScoreFor, type Meld } from '../../shared/rules.js';
 import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
 import { AILevelSelect } from './Inputs.js';
-import { kindLabel, Tile } from './Tile.js';
+import { Tile } from './Tile.js';
+import { LangSelect } from './Lobby.js';
+import { playerName, t, tileLabel, tn, windShort } from '../i18n/index.js';
 import { useVoice } from '../voice.js';
 import { VoiceButtons, VoiceMark, VoiceSettings } from './Voice.js';
 import { YakuTable } from './YakuTable.js';
 import { ExportButton } from './ExportButton.js';
 import { renderHandResult } from '../exportImage.js';
 
-const WIND = ['東', '南', '西', '北'];
-const windLabel = (k: TileKind | null) => (k === null ? '' : WIND[k - 27]);
+const windLabel = (k: TileKind | null) => (k === null ? '' : windShort(k));
 
 /** 目前的伺服器時間。每次渲染都重新計算（計時器只負責觸發重繪），倒數才不會用到舊時間而多顯示一秒 */
 function useNow(offset: number) {
@@ -104,17 +105,17 @@ function NamePlate({ p, room, game, pos }: { p: PlayerView; room: RoomView; game
         <span>{p.score}</span>
       </div>
       <div className="name">
-        {p.nickname}
+        {playerName(p)}
         <VoiceMark userId={p.userId} />
         {waiting && game.phase !== 'turn' && <span className="thinking">…</span>}
       </div>
       <div className="badges">
-        {p.seat === room.hostSeat && <span className="badge">房主</span>}
+        {p.seat === room.hostSeat && <span className="badge">{t('房主')}</span>}
         {p.isAI && <span className="badge ai">AI</span>}
-        {p.aiControlled && <span className="badge ai">AI 代打</span>}
-        {p.autoPlay && !p.aiControlled && <span className="badge ai">自動</span>}
-        {!p.connected && !p.isAI && <span className="badge warn">{p.left ? '已離開' : '離線'}</span>}
-        {game.phase === 'passThree' && game.passThreeDone[p.seat] && <span className="badge">已選</span>}
+        {p.aiControlled && <span className="badge ai">{t('AI 代打')}</span>}
+        {p.autoPlay && !p.aiControlled && <span className="badge ai">{t('自動')}</span>}
+        {!p.connected && !p.isAI && <span className="badge warn">{p.left ? t('已離開') : t('離線')}</span>}
+        {game.phase === 'passThree' && game.passThreeDone[p.seat] && <span className="badge">{t('已選')}</span>}
       </div>
     </div>
   );
@@ -130,27 +131,33 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
   const buttons: ReactElement[] = [];
   if (p.kind === 'turn') {
     if (discardButton) buttons.push(discardButton);
-    if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>自摸</button>);
-    for (const k of p.ankan ?? []) buttons.push(<button key={'an' + k} className="call kan" onClick={() => act({ type: 'ankan', kind: k })}>暗槓 <Tile kind={k} small /></button>);
-    for (const k of p.kakan ?? []) buttons.push(<button key={'ka' + k} className="call kan" onClick={() => act({ type: 'kakan', kind: k })}>加槓 <Tile kind={k} small /></button>);
+    if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>{t('自摸')}</button>);
+    for (const k of p.ankan ?? []) buttons.push(<button key={'an' + k} className="call kan" onClick={() => act({ type: 'ankan', kind: k })}>{tn('暗槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
+    for (const k of p.kakan ?? []) buttons.push(<button key={'ka' + k} className="call kan" onClick={() => act({ type: 'kakan', kind: k })}>{tn('加槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
     // 自動摸打遇到能槓時會停下來問：不槓就照常摸切
     if (game.auto.on && buttons.length && game.myDrawn !== null) {
-      buttons.push(<button key="nokan" className="call skip" onClick={() => act({ type: 'discard', tile: game.myDrawn! })}>不槓（摸切）</button>);
+      buttons.push(<button key="nokan" className="call skip" onClick={() => act({ type: 'discard', tile: game.myDrawn! })}>{t('不槓（摸切）')}</button>);
     }
   } else {
-    if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{p.kind === 'chankan' ? '搶槓' : '和'}</button>);
+    if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{p.kind === 'chankan' ? t('搶槓') : t('和')}</button>);
     // 不鳴牌：只剩和與略過
-    if (!game.auto.noCall && p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>槓</button>);
-    if (!game.auto.noCall && p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>碰</button>);
+    if (!game.auto.noCall && p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>{t('槓')}</button>);
+    if (!game.auto.noCall && p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>{t('碰')}</button>);
     for (const c of game.auto.noCall ? [] : p.chi ?? []) {
       buttons.push(
         <button key={'chi' + c.join()} className="call chi" onClick={() => act({ type: 'chi', tiles: c })}>
-          吃 <Tile tile={c[0]} small />
-          <Tile tile={c[1]} small />
+          {tn('吃 {tiles}', {
+            tiles: (
+              <>
+                <Tile tile={c[0]} small />
+                <Tile tile={c[1]} small />
+              </>
+            ),
+          })}
         </button>,
       );
     }
-    buttons.push(<button key="pass" className="call skip" onClick={() => act({ type: 'pass' })}>略過</button>);
+    buttons.push(<button key="pass" className="call skip" onClick={() => act({ type: 'pass' })}>{t('略過')}</button>);
   }
   if (!buttons.length) return null;
   return <div className="call-overlay">{buttons}</div>;
@@ -159,7 +166,7 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
 function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['myWaitScore'] | undefined }) {
   return (
     <>
-      聽牌：
+      {t('聽牌：')}
       {waits.map((w) => (
         <span key={w.kind} className={`wait ${w.left === 0 ? 'none' : ''}`}>
           <Tile kind={w.kind} small />
@@ -168,7 +175,7 @@ function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['
       ))}
       {/* 預計和牌分數（所有聽的牌、自摸或銃和；不含偶然類），最高與最低相同時只寫一個 */}
       <span className="wait-score">
-        {score ? (score.min === score.max ? `預計 ${score.max} 分` : `預計 ${score.min}～${score.max} 分`) : '未達和牌最低分數，不能和'}
+        {score ? (score.min === score.max ? t('預計 {n} 分', { n: score.max }) : t('預計 {min}～{max} 分', { min: score.min, max: score.max })) : t('未達和牌最低分數，不能和')}
       </span>
     </>
   );
@@ -191,7 +198,7 @@ function DiscardWaits({ room, game, discard, waits }: { room: RoomView; game: Ga
   return (
     <div className="discard-waits">
       <div>
-        打出 <Tile kind={discard} small /> 後聽：
+        {tn('打出 {tile} 後聽：', { tile: <Tile kind={discard} small /> })}
       </div>
       <ul>
         {rows.map((r) => (
@@ -202,14 +209,14 @@ function DiscardWaits({ room, game, discard, waits }: { room: RoomView; game: Ga
             </span>
             {r.score ? (
               <>
-                <span className="wait-score">{r.score.total} 分</span>
+                <span className="wait-score">{t('{n} 分', { n: r.score.total })}</span>
                 <span className="yaku-names">
-                  {r.score.yaku.map((y) => (y.count > 1 ? `${y.name}×${y.count}` : y.name)).join('・')}
-                  {r.score.total < min && '（未達和牌最低分數，不能和）'}
+                  {r.score.yaku.map((y) => (y.count > 1 ? `${t(y.name)}×${y.count}` : t(y.name))).join(t('・'))}
+                  {r.score.total < min && t('（未達和牌最低分數，不能和）')}
                 </span>
               </>
             ) : (
-              <span className="yaku-names">不能和</span>
+              <span className="yaku-names">{t('不能和')}</span>
             )}
           </li>
         ))}
@@ -224,8 +231,8 @@ function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal yaku-modal">
         <div className="reco-head">
-          <h2>牌型表</h2>
-          <button className="link" onClick={onClose} aria-label="關閉">✕</button>
+          <h2>{t('牌型表')}</h2>
+          <button className="link" onClick={onClose} aria-label={t('關閉')}>✕</button>
         </div>
         <YakuTable advanced={room.settings.advanced} expansion={room.settings.expansion} defaultShowAll={false} />
       </div>
@@ -258,7 +265,7 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
   const canFullscreen = typeof document !== 'undefined' && !!document.fullscreenEnabled;
   return (
     <div className="tools-menu" ref={boxRef}>
-      <button className={`chip-btn ${open ? 'on' : ''}`} aria-expanded={open} aria-label="更多設定" onClick={() => setOpen((v) => !v)}>
+      <button className={`chip-btn ${open ? 'on' : ''}`} aria-expanded={open} aria-label={t('更多設定')} onClick={() => setOpen((v) => !v)}>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path
             fill="currentColor"
@@ -268,29 +275,30 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
       </button>
       {open && (
         <div className="menu-pop" role="menu">
-          <button onClick={() => (setShowYaku(true), setOpen(false))}>牌型表</button>
-          {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>語音設定</button>}
-          <label className="toggle" title="別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效">
+          <button onClick={() => (setShowYaku(true), setOpen(false))}>{t('牌型表')}</button>
+          {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>{t('語音設定')}</button>}
+          <label className="toggle" title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')}>
             <input type="checkbox" checked={game.auto.noCall} onChange={(e) => setAuto({ noCall: e.target.checked })} />
-            不鳴牌（不吃碰槓）
+            {t('不鳴牌（不吃碰槓）')}
           </label>
           <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
             <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
-            只和最高分
+            {t('只和最高分')}
           </label>
           {room.players.some((p) => p.isAI || p.aiControlled) && (
             <label className="toggle">
-              電腦
+              {t('電腦')}
               <AILevelSelect value={room.settings.aiLevel} disabled={room.mySeat !== room.hostSeat} onChange={(level) => send({ t: 'setAILevel', level })} />
             </label>
           )}
+          <LangSelect />
           {canFullscreen && (
             <button onClick={() => (fs ? document.exitFullscreen() : document.documentElement.requestFullscreen({ navigationUI: 'hide' })).catch(() => {})}>
-              {fs ? '離開全螢幕' : '全螢幕'}
+              {fs ? t('離開全螢幕') : t('全螢幕')}
             </button>
           )}
-          <button className="danger" onClick={() => confirm('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？') && send({ t: 'leaveRoom' })}>
-            離開牌局
+          <button className="danger" onClick={() => confirm(t('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？')) && send({ t: 'leaveRoom' })}>
+            {t('離開牌局')}
           </button>
         </div>
       )}
@@ -298,8 +306,8 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
         <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowVoice(false)}>
           <div className="modal voice-modal">
             <div className="reco-head">
-              <h2>語音設定</h2>
-              <button className="link" onClick={() => setShowVoice(false)} aria-label="關閉">✕</button>
+              <h2>{t('語音設定')}</h2>
+              <button className="link" onClick={() => setShowVoice(false)} aria-label={t('關閉')}>✕</button>
             </div>
             <VoiceSettings room={room} />
           </div>
@@ -372,20 +380,20 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         {shownHint && pointKind !== null ? (
           <DiscardWaits room={room} game={game} discard={pointKind} waits={shownHint} />
         ) : game.phase === 'passReveal' ? (
-          game.passReceived ? '收到換來的 3 張牌，倒數結束後放進手牌' : '這次沒有換到牌'
+          game.passReceived ? t('收到換來的 3 張牌，倒數結束後放進手牌') : t('這次沒有換到牌')
         ) : game.myWaits.length > 0 ? (
           <Waits waits={game.myWaits} score={game.myWaitScore} />
         ) : p?.kind === 'turn' ? (
-          '點選一張牌，再按「打出」或再點一次'
+          t('點選一張牌，再按「打出」或再點一次')
         ) : passing ? (
-          '點手牌把要換出的牌放進候選格，點候選格可以放回手牌'
+          t('點手牌把要換出的牌放進候選格，點候選格可以放回手牌')
         ) : (
           ''
         )}
       </div>
       {game.thinkAvailable && (
-        <button className="chip-btn think" onClick={() => send({ t: 'think' })} title="這一局只能用一次">
-          長考 +60 秒
+        <button className="chip-btn think" onClick={() => send({ t: 'think' })} title={t('這一局只能用一次')}>
+          {t('長考 +60 秒')}
         </button>
       )}
     </div>
@@ -419,13 +427,13 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
           <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2Zm-2 18h4v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1Z" />
         </svg>
-        推薦牌型
+        {t('推薦牌型')}
       </button>
       <button className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} onClick={() => setAuto({ win: !game.auto.win })}>
-        自動和牌
+        {t('自動和牌')}
       </button>
-      <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title="只維持這一局，下一局自動關閉" onClick={() => setAuto({ on: !game.auto.on })}>
-        自動摸打
+      <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，下一局自動關閉')} onClick={() => setAuto({ on: !game.auto.on })}>
+        {t('自動摸打')}
       </button>
       <VoiceButtons />
       <ToolsMenu room={room} game={game} setAuto={setAuto} />
@@ -438,7 +446,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       <div className="pass-slots">
         {[0, 1, 2].map((i) =>
           selected[i] !== undefined ? (
-            <button key={selected[i]} className="pass-slot filled" title="放回手牌" onClick={() => setSelected((cur) => cur.filter((x) => x !== selected[i]))}>
+            <button key={selected[i]} className="pass-slot filled" title={t('放回手牌')} onClick={() => setSelected((cur) => cur.filter((x) => x !== selected[i]))}>
               <Tile tile={selected[i]} />
             </button>
           ) : (
@@ -448,10 +456,10 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       </div>
       <div className="pass-actions">
         <button className="call pon" disabled={selected.length !== 3} onClick={() => (act({ type: 'passThree', tiles: selected }), setSelected([]))}>
-          換出
+          {t('換出')}
         </button>
         <button className="call skip" onClick={() => (act({ type: 'passThree', tiles: null }), setSelected([]))}>
-          不換
+          {t('不換')}
         </button>
       </div>
     </div>
@@ -462,7 +470,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   const discardButton =
     toDiscard !== null ? (
       <button key="discard" className="call discard" onClick={() => (act({ type: 'discard', tile: toDiscard }), setSelected([]))}>
-        打出 <Tile tile={toDiscard} small />
+        {tn('打出 {tile}', { tile: <Tile tile={toDiscard} small /> })}
       </button>
     ) : null;
 
@@ -478,14 +486,14 @@ function SwapReveal({ game, now }: { game: GameView; now: number }) {
       {game.passSent && game.passReceived ? (
         <>
           <div className="swap-row">
-            <span className="label">換出</span>
+            <span className="label">{t('換出')}</span>
             {game.passSent.map((t) => (
               <Tile key={t} tile={t} />
             ))}
           </div>
           <div className="swap-arrow">▼</div>
           <div className="swap-row">
-            <span className="label">收到</span>
+            <span className="label">{t('收到')}</span>
             {game.passReceived.map((t, i) => (
               <span key={t} className="flip" style={{ animationDelay: `${0.3 + i * 0.25}s` }}>
                 <Tile back />
@@ -495,7 +503,7 @@ function SwapReveal({ game, now }: { game: GameView; now: number }) {
           </div>
         </>
       ) : (
-        <div className="label">這次沒有換到牌</div>
+        <div className="label">{t('這次沒有換到牌')}</div>
       )}
       {remain !== null && (
         <div className="swap-count" key={remain}>
@@ -511,11 +519,11 @@ function SwapMini({ game }: { game: GameView }) {
   if (!game.passSent || !game.passReceived) return null;
   return (
     <div className="swap-mini">
-      <span className="label">換出</span>
+      <span className="label">{t('換出')}</span>
       {game.passSent.map((t) => (
         <Tile key={t} tile={t} dim />
       ))}
-      <span className="label">收到</span>
+      <span className="label">{t('收到')}</span>
       {game.passReceived.map((t) => (
         <Tile key={t} tile={t} />
       ))}
@@ -552,39 +560,35 @@ function recommendInput(room: RoomView, game: GameView) {
 function HintExtras({ room, game }: { room: RoomView; game: GameView }) {
   const me = room.mySeat!;
   const fast = useMemo(() => fastestWin(recommendInput(room, game)), [game.myHand, room.players, room.settings.advanced]);
-  const who = (s: number) => (s === me ? '你' : room.players[s]?.nickname);
+  const who = (s: number) => (s === me ? t('你') : playerName(room.players[s]));
   const status =
     game.phase === 'passThree'
-      ? '換三張：大家選牌中'
+      ? t('換三張：大家選牌中')
       : game.phase === 'passReveal'
-        ? '換三張：亮牌中'
+        ? t('換三張：亮牌中')
         : game.phase === 'claim' || game.phase === 'chankan'
           ? game.pending
-            ? '可以鳴牌：吃、碰、槓或和'
-            : `等待 ${game.waitingSeats.map(who).join('、')} 決定是否鳴牌`
+            ? t('可以鳴牌：吃、碰、槓或和')
+            : t('等待 {names} 決定是否鳴牌', { names: game.waitingSeats.map(who).join(t('、')) })
           : game.phase === 'turn'
             ? game.currentSeat === me
-              ? '輪到你打牌'
-              : `輪到 ${who(game.currentSeat)} 打牌`
+              ? t('輪到你打牌')
+              : t('輪到 {name} 打牌', { name: who(game.currentSeat) })
             : '';
   return (
     <div className="hint-extras">
       {status && <div className="hint-status">{status}</div>}
       {game.myWaits.length === 0 && game.phase !== 'passThree' && game.phase !== 'passReveal' && Number.isFinite(fast.shanten) && (
         <div className="hint-eff">
-          牌效率：{shantenText(fast.shanten)}・有效牌 {fast.ukeire} 張
-          {fast.discard !== undefined && (
-            <>
-              ，建議打 <Tile kind={fast.discard} small />
-            </>
-          )}
+          {t('牌效率：{shanten}・有效牌 {n} 張', { shanten: shantenText(fast.shanten), n: fast.ukeire })}
+          {fast.discard !== undefined && tn('，建議打 {tile}', { tile: <Tile kind={fast.discard} small /> })}
         </div>
       )}
     </div>
   );
 }
 
-const shantenText = (s: number) => (s < 0 ? '已成形' : s === 0 ? '聽牌' : `向聽 ${s}`);
+const shantenText = (s: number) => (s < 0 ? t('已成形') : s === 0 ? t('聽牌') : t('向聽 {n}', { n: s }));
 
 type RecoMode = 'basic' | 'outcome';
 const RECO_MODE_KEY = 'recoMode';
@@ -610,16 +614,16 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
     <aside className={`reco-panel ${mode}`}>
       {mode === 'beside' && (
         <div className="reco-head">
-          <strong>推薦牌型</strong>
-          <button className="link" onClick={onClose} aria-label="關閉">✕</button>
+          <strong>{t('推薦牌型')}</strong>
+          <button className="link" onClick={onClose} aria-label={t('關閉')}>✕</button>
         </div>
       )}
       <div className="reco-mode" role="tablist">
         <button role="tab" aria-selected={recoMode === 'basic'} className={recoMode === 'basic' ? 'on' : ''} onClick={() => pick('basic')}>
-          普通型
+          {t('普通型')}
         </button>
         <button role="tab" aria-selected={recoMode === 'outcome'} className={recoMode === 'outcome' ? 'on' : ''} onClick={() => pick('outcome')}>
-          進階型（看和牌結果）
+          {t('進階型（看和牌結果）')}
         </button>
       </div>
       {recoMode === 'basic' ? <BasicReco room={room} game={game} /> : <OutcomeReco room={room} game={game} />}
@@ -638,42 +642,42 @@ function BasicReco({ room, game }: { room: RoomView; game: GameView }) {
     <>
       <div className="reco-fast">
         <div className="reco-title">
-          <span>最快和牌</span>
+          <span>{t('最快和牌')}</span>
           <span className="small muted">
-            {shantenText(fast.shanten)}・有效牌 {fast.ukeire} 張
+            {t('{shanten}・有效牌 {n} 張', { shanten: shantenText(fast.shanten), n: fast.ukeire })}
           </span>
         </div>
         {fast.discard !== undefined && (
           <div className="reco-discard">
-            <span className="small muted">建議打</span>
+            <span className="small muted">{t('建議打')}</span>
             <Tile kind={fast.discard} small />
           </div>
         )}
       </div>
-      {recs.length === 0 && <p className="muted small">目前沒有推薦{room.settings.minWinScore > 0 ? '（已排除未達和牌最低分數的牌型）' : ''}</p>}
+      {recs.length === 0 && <p className="muted small">{room.settings.minWinScore > 0 ? t('目前沒有推薦（已排除未達和牌最低分數的牌型）') : t('目前沒有推薦')}</p>}
       {/* 依期望值排序；分成可以吃碰做牌的，以及只能自己摸進來（門清）的 */}
       {([true, false] as const).map((callable) => {
         const group = recs.filter((r) => r.callable === callable);
         if (!group.length) return null;
         return (
           <section key={String(callable)} className="reco-group">
-            <div className="reco-group-title small">{callable ? '可吃碰' : '門清（只能自己摸進來）'}</div>
+            <div className="reco-group-title small">{callable ? t('可吃碰') : t('門清（只能自己摸進來）')}</div>
             <ol>
               {group.map((r) => (
                 <li key={r.id}>
                   <div className="reco-title">
-                    <span>{r.name}</span>
-                    <span className="pts">{r.points} 分</span>
+                    <span>{t(r.name)}</span>
+                    <span className="pts">{t('{n} 分', { n: r.points })}</span>
                   </div>
                   <div className="small muted">
-                    {shantenText(r.shanten)}・有效牌 {r.ukeire} 張
+                    {t('{shanten}・有效牌 {n} 張', { shanten: shantenText(r.shanten), n: r.ukeire })}
                   </div>
                   <div className="small reco-ev">
-                    和牌率 {Math.round(r.winRate * 100)}%・期望 {r.ev.toFixed(1)} 分
+                    {t('和牌率 {rate}%・期望 {ev} 分', { rate: Math.round(r.winRate * 100), ev: r.ev.toFixed(1) })}
                   </div>
                   {r.discard !== undefined && (
                     <div className="reco-discard">
-                      <span className="small muted">朝這個牌型打</span>
+                      <span className="small muted">{t('朝這個牌型打')}</span>
                       <Tile kind={r.discard} small />
                     </div>
                   )}
@@ -683,7 +687,7 @@ function BasicReco({ room, game }: { room: RoomView; game: GameView }) {
           </section>
         );
       })}
-      <p className="small muted">依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），已經沒有剩牌的牌型不列出；部分牌型為近似值，僅供參考。</p>
+      <p className="small muted">{t('依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），已經沒有剩牌的牌型不列出；部分牌型為近似值，僅供參考。')}</p>
     </>
   );
 }
@@ -693,19 +697,19 @@ function OutcomeReco({ room, game }: { room: RoomView; game: GameView }) {
   const me = room.players[room.mySeat!];
   const r = useMemo(() => outcomeRecommend(recommendInput(room, game)), [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
   if (r.tooFar) {
-    return <p className="muted small">目前 {r.shanten} 向聽。進階型只計算 {OUTCOME_MAX_SHANTEN} 向聽以內（再遠變化太多），請先參考普通型。</p>;
+    return <p className="muted small">{t('目前 {n} 向聽。進階型只計算 {max} 向聽以內（再遠變化太多），請先參考普通型。', { n: r.shanten, max: OUTCOME_MAX_SHANTEN })}</p>;
   }
-  if (r.shanten < 0) return <p className="muted small">已經是和牌形。</p>;
-  if (!r.plans.length) return <p className="muted small">照目前的牌，沒有能達到和牌最低分數的和法。</p>;
+  if (r.shanten < 0) return <p className="muted small">{t('已經是和牌形。')}</p>;
+  if (!r.plans.length) return <p className="muted small">{t('照目前的牌，沒有能達到和牌最低分數的和法。')}</p>;
   return (
     <>
       {r.plans.map((p, i) => (
         <section key={p.discard ?? i} className="outcome-plan">
           {p.discard !== undefined && (
             <div className="reco-discard">
-              <span className="small muted">打</span>
+              <span className="small muted">{t('打')}</span>
               <Tile kind={p.discard} small />
-              <span className="small muted">之後（{shantenText(p.shanten)}）</span>
+              <span className="small muted">{t('之後（{shanten}）', { shanten: shantenText(p.shanten) })}</span>
             </div>
           )}
           <ol>
@@ -713,21 +717,21 @@ function OutcomeReco({ room, game }: { room: RoomView; game: GameView }) {
               <li key={g.draws.join()}>
                 <div className="reco-title">
                   <span className="outcome-draws">
-                    <span className="small muted">{p.shanten === 0 ? '和' : '再進'}</span>
+                    <span className="small muted">{p.shanten === 0 ? t('和') : t('再進')}</span>
                     {g.draws.map((k) => (
                       <Tile key={k} kind={k} small />
                     ))}
-                    <span className="small muted">剩 {g.left} 張</span>
+                    <span className="small muted">{t('剩 {n} 張', { n: g.left })}</span>
                   </span>
-                  <span className="pts">{g.total} 分</span>
+                  <span className="pts">{t('{n} 分', { n: g.total })}</span>
                 </div>
-                <div className="small muted">{g.yaku.join('・')}</div>
+                <div className="small muted">{g.yaku.map((y) => (y.includes('×') ? y.replace(/^(.*)×/, (_, n) => `${t(n)}×`) : t(y))).join(t('・'))}</div>
               </li>
             ))}
           </ol>
         </section>
       ))}
-      <p className="small muted">往下模擬摸打到聽牌，以最後和牌的分數（自摸或銃和取高、不含偶然類）比較；每個方向取之後都摸到好牌的最好情況，看不到剩的牌與未達和牌最低分數的和法不算。</p>
+      <p className="small muted">{t('往下模擬摸打到聽牌，以最後和牌的分數（自摸或銃和取高、不含偶然類）比較；每個方向取之後都摸到好牌的最好情況，看不到剩的牌與未達和牌最低分數的和法不算。')}</p>
     </>
   );
 }
@@ -740,17 +744,16 @@ function Center({ room, game, now }: { room: RoomView; game: GameView; now: numb
       <div className={`center-info ${recent ? 'has-recent' : ''}`}>
         {/* 橫式：局數、剩幾張、倒數放大，各家的門風與分數放在名牌裡；直式這些都在上方狀態列 */}
         <div className="round">
-          第 {game.handNo} / {game.totalHands} 局
+          {t('第 {n} / {total} 局', { n: game.handNo, total: game.totalHands })}
         </div>
         <div className="wall-left">
-          餘 <b>{Math.max(0, game.wallRemaining - game.deadWall)}</b> 張
+          {tn('餘 {n} 張', { n: <b>{Math.max(0, game.wallRemaining - game.deadWall)}</b> })}
         </div>
         {recent && (
           // 剛打出（或加槓）的牌放大顯示，鳴牌時才知道是哪一張
           <div className={`recent ${game.phase === 'claim' || game.phase === 'chankan' ? 'claiming' : ''}`}>
             <span className="small">
-              {room.players[recent.seat]?.nickname}
-              {game.kakanTile ? ' 加槓' : ' 打出'}
+              {t(game.kakanTile ? '{name} 加槓' : '{name} 打出', { name: playerName(room.players[recent.seat]) })}
             </span>
             <Tile tile={recent.tile} />
           </div>
@@ -786,18 +789,18 @@ function YakuChips({ score, totalLabel }: { score: HandScore; totalLabel: string
     <div className="yaku-chips">
       {score.baseScore > 0 && (
         <span className="chip">
-          和牌底分 <b>{score.baseScore}</b>
+          {tn('和牌底分 {n}', { n: <b>{score.baseScore}</b> })}
         </span>
       )}
       {score.yaku.map((y) => (
         <span key={y.id} className="chip">
-          {y.name}
+          {t(y.name)}
           {y.count > 1 ? ` ×${y.count}` : ''} <b>{y.points}</b>
         </span>
       ))}
       <span className="chip total">
         {totalLabel}
-        {score.limit ? '（滿貫）' : ''} <b>{score.total}</b>
+        {score.limit ? t('（滿貫）') : ''} <b>{score.total}</b>
       </span>
     </div>
   );
@@ -809,7 +812,7 @@ function Delta({ d }: { d: number }) {
 
 /** 一局結果的卡片（和牌 → 聽牌 → 其他）與分數表；totals = 這一局結束後的累計分數。牌局中與結束後重看共用 */
 export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandResultView; totals: number[]; live: boolean }) {
-  const names = room.players.map((p) => p.nickname);
+  const names = room.players.map((p) => playerName(p));
   const me = room.mySeat;
   const shown = r.shown ?? [];
   const winnerOf = (s: number) => r.winners.find((w) => w.seat === s);
@@ -820,45 +823,45 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
   });
   return (
     <>
-      <h2>{r.kind === 'draw' ? '流局' : r.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : '和牌'}`).join('、')}</h2>
+      <h2>{r.kind === 'draw' ? t('流局') : r.winners.map((w) => t(w.tsumo ? '{name} 自摸' : '{name} 和牌', { name: names[w.seat] })).join(t('、'))}</h2>
       {order.map((s) => {
         const w = winnerOf(s);
-        const t = tenpaiOf(s);
+        const tp = tenpaiOf(s);
         const d = r.deltas[s];
         if (w) {
           return (
             <section key={s} className="result-card win">
               <header>
                 <span className="name">{names[s]}</span>
-                <span className="tag win">{w.tsumo ? '自摸' : `銃和・放銃 ${names[w.from!]}`}</span>
+                <span className="tag win">{w.tsumo ? t('自摸') : t('銃和・放銃 {name}', { name: names[w.from!] })}</span>
                 <Delta d={d} />
               </header>
               <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} extra={{ tile: w.tile }} />
-              <YakuChips score={w.score} totalLabel="和牌分數" />
+              <YakuChips score={w.score} totalLabel={t('和牌分數')} />
             </section>
           );
         }
-        if (t) {
-          const capped = d < t.maxScore && d > 0;
+        if (tp) {
+          const capped = d < tp.maxScore && d > 0;
           return (
             <section key={s} className="result-card tenpai">
               <header>
                 <span className="name">{names[s]}</span>
-                <span className="tag tenpai">聽牌</span>
+                <span className="tag tenpai">{t('聽牌')}</span>
                 <Delta d={d} />
               </header>
               <div className="waits-line small">
-                聽
-                {t.waits.map((k) => (
-                  <Tile key={k} kind={k} small highlight={k === t.best.tile} />
+                {t('聽')}
+                {tp.waits.map((k) => (
+                  <Tile key={k} kind={k} small highlight={k === tp.best.tile} />
                 ))}
               </div>
               <div className="small muted">
-                最高分的和法：{t.best.tsumo ? '自摸' : '銃和'}「{kindLabel(t.best.tile)}」（聽牌得分依此計算）
+                {t(tp.best.tsumo ? '最高分的和法：自摸「{tile}」（聽牌得分依此計算）' : '最高分的和法：銃和「{tile}」（聽牌得分依此計算）', { tile: tileLabel(tp.best.tile) })}
               </div>
-              <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: t.best.tile }} />
-              <YakuChips score={t.best.score} totalLabel="最高和牌分數" />
-              {capped && <div className="small muted">聽牌得分不超過和牌者的得分，實得 {d} 分</div>}
+              <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: tp.best.tile }} />
+              <YakuChips score={tp.best.score} totalLabel={t('最高和牌分數')} />
+              {capped && <div className="small muted">{t('聽牌得分不超過和牌者的得分，實得 {n} 分', { n: d })}</div>}
             </section>
           );
         }
@@ -868,15 +871,15 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
           <section key={s} className="result-card other">
             <header>
               <span className="name">{names[s]}</span>
-              <span className="tag">{shown.includes(s) ? '展示手牌' : '未聽牌'}</span>
+              <span className="tag">{shown.includes(s) ? t('展示手牌') : t('未聽牌')}</span>
               <Delta d={d} />
             </header>
             {visible ? (
               <HandRow hand={r.hands[s]} melds={r.melds[s]} />
             ) : s === me && live ? (
-              <button className="show-hand" onClick={() => send({ t: 'showHand' })}>展示我的手牌</button>
+              <button className="show-hand" onClick={() => send({ t: 'showHand' })}>{t('展示我的手牌')}</button>
             ) : (
-              <div className="small muted">手牌未公開</div>
+              <div className="small muted">{t('手牌未公開')}</div>
             )}
           </section>
         );
@@ -885,7 +888,7 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
         <tbody>
           {room.players.map((p) => (
             <tr key={p.seat}>
-              <td>{p.nickname}</td>
+              <td>{playerName(p)}</td>
               <td className={r.deltas[p.seat] > 0 ? 'pos' : r.deltas[p.seat] < 0 ? 'neg' : ''}>
                 {r.deltas[p.seat] > 0 ? '+' : ''}
                 {r.deltas[p.seat]}
@@ -913,16 +916,19 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
         <ResultBody room={room} r={r} totals={totals} live />
         <div className="result-actions">
           {me === null ? (
-            <p className="muted small">觀戰中：等待玩家進入下一局{remain !== null ? `（${remain}）` : ''}</p>
+            <p className="muted small">
+              {t('觀戰中：等待玩家進入下一局')}
+              {remain !== null ? `（${remain}）` : ''}
+            </p>
           ) : (
             <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
-              {acked ? '等待其他玩家…' : game.handNo >= game.totalHands ? '查看結算' : '下一局'}
+              {acked ? t('等待其他玩家…') : game.handNo >= game.totalHands ? t('查看結算') : t('下一局')}
               {remain !== null ? `（${remain}）` : ''}
             </button>
           )}
           <ExportButton
             render={() => renderHandResult(room, { handNo: game.handNo, totalHands: game.totalHands, result: r, totals })}
-            filename={`原點麻將-${room.id}-第${game.handNo}局.png`}
+            filename={`mahjong-${room.id}-hand${game.handNo}.png`}
           />
         </div>
       </div>
@@ -932,30 +938,30 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
 
 function PauseOverlay({ room }: { room: RoomView }) {
   const paused = room.paused!;
-  const names = paused.disconnectedSeats.map((s) => room.players[s].nickname).join('、');
+  const names = paused.disconnectedSeats.map((s) => playerName(room.players[s])).join(t('、'));
   const iDecide = paused.deciderSeat === room.mySeat;
   return (
     <div className="modal-backdrop">
       <div className="modal narrow">
-        <h2>牌局暫停</h2>
-        <p>{names} 已斷線或離開。</p>
+        <h2>{t('牌局暫停')}</h2>
+        <p>{t('{names} 已斷線或離開。', { names })}</p>
         {iDecide ? (
           <>
-            <p>請決定要等待玩家回來、交給 AI 代打，或解散牌局。</p>
+            <p>{t('請決定要等待玩家回來、交給 AI 代打，或解散牌局。')}</p>
             <div className="row">
               <button className="primary" onClick={() => send({ t: 'decide', choice: 'ai' })}>
-                交給 AI 代打
+                {t('交給 AI 代打')}
               </button>
-              <button onClick={() => send({ t: 'decide', choice: 'dissolve' })}>解散牌局</button>
+              <button onClick={() => send({ t: 'decide', choice: 'dissolve' })}>{t('解散牌局')}</button>
             </div>
           </>
         ) : (
           <p className="muted">
-            等待 {paused.deciderSeat !== null ? room.players[paused.deciderSeat].nickname : '玩家'} 決定（玩家回來後會自動繼續）…
+            {t('等待 {name} 決定（玩家回來後會自動繼續）…', { name: paused.deciderSeat !== null ? playerName(room.players[paused.deciderSeat]) : t('玩家') })}
           </p>
         )}
-        <button className="link" onClick={() => (room.mySeat === null || confirm('確定要離開牌局嗎？')) && send({ t: 'leaveRoom' })}>
-          {room.mySeat === null ? '離開觀戰' : '離開房間'}
+        <button className="link" onClick={() => (room.mySeat === null || confirm(t('確定要離開牌局嗎？'))) && send({ t: 'leaveRoom' })}>
+          {room.mySeat === null ? t('離開觀戰') : t('離開房間')}
         </button>
       </div>
     </div>
@@ -973,7 +979,7 @@ function StatusBar({ room, game, now, view }: { room: RoomView; game: GameView; 
     <header className="status-bar">
       <div className="status-row">
         <span className="round">
-          第 {game.handNo} / {game.totalHands} 局・餘 {Math.max(0, game.wallRemaining - game.deadWall)}
+          {t('第 {n} / {total} 局・餘 {left}', { n: game.handNo, total: game.totalHands, left: Math.max(0, game.wallRemaining - game.deadWall) })}
         </span>
         {remain !== null && <span className={`status-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
       </div>
@@ -983,7 +989,7 @@ function StatusBar({ room, game, now, view }: { room: RoomView; game: GameView; 
           return (
             <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === room.mySeat ? 'me' : ''}`}>
               <b>{windLabel(p.wind)}</b>
-              <span className="nm">{p.seat === room.mySeat ? '我' : p.nickname}</span>
+              <span className="nm">{p.seat === room.mySeat ? t('我') : playerName(p)}</span>
               <VoiceMark userId={p.userId} />
               <span className="pt">{p.score}</span>
             </span>
@@ -1004,14 +1010,14 @@ function InfoCard({ room, game, tab, setTab, hint }: { room: RoomView; game: Gam
     <section className="info-card">
       <div className="info-tabs" role="tablist">
         <button role="tab" aria-selected={current === 'hint'} className={current === 'hint' ? 'on' : ''} onClick={() => setTab('hint')}>
-          {game.myWaits.length > 0 ? '聽牌' : '提示'}
+          {game.myWaits.length > 0 ? t('聽牌') : t('提示')}
         </button>
         <button role="tab" aria-selected={current === 'reco'} className={current === 'reco' ? 'on' : ''} onClick={() => setTab('reco')}>
-          推薦牌型
+          {t('推薦牌型')}
         </button>
         {hasSwap && (
           <button role="tab" aria-selected={current === 'swap'} className={current === 'swap' ? 'on' : ''} onClick={() => setTab('swap')}>
-            換三張
+            {t('換三張')}
           </button>
         )}
       </div>
@@ -1026,13 +1032,13 @@ function InfoCard({ room, game, tab, setTab, hint }: { room: RoomView; game: Gam
         {current === 'swap' && hasSwap && (
           <div className="swap-card">
             <div className="swap-row">
-              <span className="small">換出</span>
+              <span className="small">{t('換出')}</span>
               {game.passSent!.map((t) => (
                 <Tile key={t} tile={t} dim small />
               ))}
             </div>
             <div className="swap-row">
-              <span className="small">收到</span>
+              <span className="small">{t('收到')}</span>
               {game.passReceived!.map((t) => (
                 <Tile key={t} tile={t} small />
               ))}
@@ -1108,7 +1114,7 @@ export function TableScreen({ state }: { state: AppState }) {
     document.body.classList.add('in-game');
     return () => document.body.classList.remove('in-game');
   }, []);
-  if (!game) return <div className="panel narrow">準備下一局…</div>;
+  if (!game) return <div className="panel narrow">{t('準備下一局…')}</div>;
   if (room.mySeat === null) return <SpectatorLayout room={room} game={game} now={now} landscape={landscape} />;
   return <TableLayout room={room} game={game} now={now} pointKind={pointKind} setPointKind={setPointKind} showReco={showReco} setShowReco={setShowReco} landscape={landscape} />;
 }
@@ -1149,7 +1155,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
             {reco}
             {my.melds && (
               <div className="side-melds">
-                <div className="small muted">鳴牌</div>
+                <div className="small muted">{t('鳴牌')}</div>
                 {my.melds}
               </div>
             )}
@@ -1180,15 +1186,16 @@ function SpectatorLayout({ room, game, now, landscape }: { room: RoomView; game:
   const board = <Board room={room} game={game} now={now} pointKind={null} overlay={null} swapMini={false} view={view} />;
   const tools = (
     <div className="my-tools spectator-tools">
-      <span className="badge spectating">觀戰中</span>
-      <button className="chip-btn" onClick={() => setView((v) => (v + 1) % n)} title="切換坐在下方的玩家">
-        視角：{room.players[view]?.nickname}
+      <span className="badge spectating">{t('觀戰中')}</span>
+      <button className="chip-btn" onClick={() => setView((v) => (v + 1) % n)} title={t('切換坐在下方的玩家')}>
+        {t('視角：{name}', { name: playerName(room.players[view]) })}
       </button>
       <button className="chip-btn" onClick={() => setShowYaku(true)}>
-        牌型表
+        {t('牌型表')}
       </button>
+      <LangSelect />
       <button className="chip-btn" onClick={() => send({ t: 'leaveRoom' })}>
-        離開觀戰
+        {t('離開觀戰')}
       </button>
     </div>
   );

@@ -1,6 +1,8 @@
 import type { AILevel } from '../../shared/rules.js';
+import { t } from '../i18n/index.js';
 
-export const AI_LEVEL_LABEL: Record<AILevel, string> = { beginner: '初學者', easy: '簡單', normal: '普通', hard: '困難' };
+const AI_LEVEL_KEY: Record<AILevel, string> = { beginner: '初學者', easy: '簡單', normal: '普通', hard: '困難' };
+export const aiLevelLabel = (l: AILevel) => t(AI_LEVEL_KEY[l]);
 
 /**
  * 數字輸入框。React 的受控 number input 在數值相同時不會改寫畫面上的字，
@@ -41,10 +43,10 @@ export function NumInput({
 export function AILevelSelect({ value, onChange, disabled }: { value: AILevel; onChange: (v: AILevel) => void; disabled?: boolean }) {
   return (
     <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as AILevel)}>
-      {(Object.keys(AI_LEVEL_LABEL) as AILevel[]).map((l) => (
+      {(Object.keys(AI_LEVEL_KEY) as AILevel[]).map((l) => (
         <option key={l} value={l}>
-          {AI_LEVEL_LABEL[l]}
-          {l === 'hard' ? '（會防守）' : ''}
+          {aiLevelLabel(l)}
+          {l === 'hard' ? t('（會防守）') : ''}
         </option>
       ))}
     </select>

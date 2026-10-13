@@ -370,6 +370,11 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   background: rgba(0, 0, 0, 0.35); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.35); white-space: nowrap; box-shadow: none;
 }
 .chip-btn svg { flex: none; }
+/* 語言切換 */
+.lang-select { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+.lang-select select { padding: 4px 6px; font-size: 0.9em; }
+.menu-pop .lang-select, .spectator-tools .lang-select { margin-left: 0; }
+.spectator-tools .lang-select select { max-width: 110px; }
 .chip-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.45); }
 .chip-btn.on, .chip-btn.on:hover:not(:disabled) { background: var(--gold); border-color: var(--gold); color: #fff; }
 .tools-menu { position: relative; }
@@ -483,6 +488,20 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 @media (max-width: 420px) {
   .table.portrait .my-tools { flex-wrap: nowrap; gap: 6px; }
   .table.portrait .chip-btn { padding: 6px 10px; font-size: 0.9em; }
+  /* 文字按鈕可以縮小（字太長時以…截斷），不同語言、窄螢幕都不會把工具列撐出畫面 */
+  .table.portrait .my-tools > .chip-btn:not(.icon) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .table.portrait .my-tools .chip-btn.icon, .table.portrait .tools-menu .chip-btn { flex: none; padding: 6px 8px; }
+}
+@media (max-width: 380px) {
+  .table.portrait .my-tools { gap: 4px; }
+  .table.portrait .my-tools > .chip-btn:not(.icon) { padding: 6px 8px; }
+  .table.portrait .my-tools > .chip-btn:not(.icon) > svg { display: none; }
+}
+@media (max-width: 340px) {
+  .table.portrait .my-tools { gap: 3px; }
+  .table.portrait .my-tools .chip-btn { font-size: 0.8em; min-height: 36px; }
+  .table.portrait .my-tools > .chip-btn:not(.icon) { padding: 5px 5px; }
+  .table.portrait .my-tools .chip-btn.icon, .table.portrait .tools-menu .chip-btn { padding: 5px 6px; }
 }
 /* 矮的橫式畫面（手機橫放）：提示文字與按鈕縮小一點 */
 @media (max-height: 500px) {

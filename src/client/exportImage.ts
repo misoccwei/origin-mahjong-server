@@ -1,7 +1,8 @@
 import type { HandResultView, RoomView } from '../shared/protocol.js';
 import type { Meld } from '../shared/rules.js';
 import type { HandScore } from '../shared/scoring.js';
-import { WHITE, kindOf, tileName, type TileId, type TileKind } from '../shared/tiles.js';
+import { WHITE, kindOf, type TileId, type TileKind } from '../shared/tiles.js';
+import { playerName, t, tileLabel } from './i18n/index.js';
 import { faceUrl } from './components/Tile.js';
 import { toast } from './net.js';
 
@@ -173,14 +174,14 @@ const signed = (d: number) => (d > 0 ? `+${d}` : `${d}`);
 const deltaColor = (d: number) => (d > 0 ? C.pos : d < 0 ? C.neg : C.muted);
 
 function scoreChips(score: HandScore) {
-  const items = score.baseScore > 0 ? [`和牌底分 ${score.baseScore}`] : [];
-  for (const y of score.yaku) items.push(`${y.name}${y.count > 1 ? ` ×${y.count}` : ''} ${y.points}`);
+  const items = score.baseScore > 0 ? [t('和牌底分 {n}', { n: score.baseScore })] : [];
+  for (const y of score.yaku) items.push(`${t(y.name)}${y.count > 1 ? ` ×${y.count}` : ''} ${y.points}`);
   return items;
 }
 
 function header(p: Painter, room: RoomView, subtitle: string, title: string) {
-  p.text('原點麻將', PAD, p.y + 12, { size: 14, weight: 700, color: C.gold });
-  p.text(`房號 ${room.id}・${subtitle}・${new Date().toLocaleString()}`, W - PAD, p.y + 12, { size: 13, color: '#b7cfc3', align: 'right' });
+  p.text(t('原點麻將'), PAD, p.y + 12, { size: 14, weight: 700, color: C.gold });
+  p.text(`${t('房號 {id}', { id: room.id })}${t('・')}${subtitle}${t('・')}${new Date().toLocaleString()}`, W - PAD, p.y + 12, { size: 13, color: '#b7cfc3', align: 'right' });
   p.y += 34;
   p.text(title, PAD, p.y + 16, { size: 26, weight: 800, color: '#fff' });
   p.y += 44;
@@ -191,14 +192,14 @@ export async function renderHandResult(
   room: RoomView,
   { handNo, totalHands, result: r, totals }: { handNo: number; totalHands: number; result: HandResultView; totals: number[] },
 ): Promise<HTMLCanvasElement> {
-  const names = room.players.map((p) => p.nickname ?? '-');
+  const names = room.players.map((p) => (p.nickname ? playerName(p) : '-'));
   const p = new Painter(3000);
   const kinds = [...r.hands.flat(), ...r.melds.flat().flatMap((m) => m.tiles)].filter((t) => t >= 0).map(kindOf);
-  kinds.push(...r.tenpai.flatMap((t) => [...t.waits, t.best.tile]));
+  kinds.push(...r.tenpai.flatMap((x) => [...x.waits, x.best.tile]));
   await p.preload(kinds);
 
-  const title = r.kind === 'draw' ? '流局' : r.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : '和牌'}`).join('、');
-  header(p, room, `第 ${handNo} / ${totalHands} 局`, title);
+  const title = r.kind === 'draw' ? t('流局') : r.winners.map((w) => t(w.tsumo ? '{name} 自摸' : '{name} 和牌', { name: names[w.seat] })).join(t('、'));
+  header(p, room, t('第 {n} / {total} 局', { n: handNo, total: totalHands }), title);
 
   const winnerOf = (s: number) => r.winners.find((w) => w.seat === s);
   const tenpaiOf = (s: number) => (winnerOf(s) ? undefined : r.tenpai.find((t) => t.seat === s));
@@ -210,32 +211,32 @@ export async function renderHandResult(
   const right = W - PAD - 16;
   for (const s of order) {
     const w = winnerOf(s);
-    const t = tenpaiOf(s);
+    const tp = tenpaiOf(s);
     const visible = r.hands[s].length > 0;
     const top = p.y;
     // 同一段程式跑兩次：第一次只量高度（dry），畫好卡片背景後再真的畫內容
     const draw = () => {
       p.y = top + 12;
-      const tag = w ? (w.tsumo ? '自摸' : `銃和・放銃 ${names[w.from!]}`) : t ? '聽牌' : r.shown.includes(s) ? '展示手牌' : '未聽牌';
+      const tag = w ? (w.tsumo ? t('自摸') : t('銃和・放銃 {name}', { name: names[w.from!] })) : tp ? t('聽牌') : r.shown.includes(s) ? t('展示手牌') : t('未聽牌');
       const nw = p.text(names[s], left, p.y + 11, { size: 17, weight: 700 });
       p.font(12, 700);
       const tw = p.ctx.measureText(tag).width + 16;
-      p.roundRect(left + nw + 10, p.y + 1, tw, 20, 10, w ? C.win : t ? C.tenpai : '#ece8dc');
-      p.text(tag, left + nw + 18, p.y + 11, { size: 12, weight: 700, color: w || t ? '#fff' : C.muted });
+      p.roundRect(left + nw + 10, p.y + 1, tw, 20, 10, w ? C.win : tp ? C.tenpai : '#ece8dc');
+      p.text(tag, left + nw + 18, p.y + 11, { size: 12, weight: 700, color: w || tp ? '#fff' : C.muted });
       p.text(signed(r.deltas[s]), right, p.y + 11, { size: 19, weight: 800, color: deltaColor(r.deltas[s]), align: 'right' });
       p.y += 30;
-      if (t) {
-        p.text(`聽 ${t.waits.map(tileName).join('、')}・最高分的和法：${t.best.tsumo ? '自摸' : '銃和'}「${tileName(t.best.tile)}」`, left, p.y + 9, { size: 13, color: C.muted });
+      if (tp) {
+        p.text(`${t('聽 {tiles}', { tiles: tp.waits.map(tileLabel).join(t('、')) })}${t('・')}${t(tp.best.tsumo ? '最高分的和法：自摸「{tile}」' : '最高分的和法：銃和「{tile}」', { tile: tileLabel(tp.best.tile) })}`, left, p.y + 9, { size: 13, color: C.muted });
         p.y += 24;
       }
       if (visible) {
         const hand = w ? r.hands[s].filter((x) => x !== w.tile) : r.hands[s];
-        p.handRow(left, right, hand, r.melds[s], w ? kindOf(w.tile) : t?.best.tile);
+        p.handRow(left, right, hand, r.melds[s], w ? kindOf(w.tile) : tp?.best.tile);
         p.y += 10;
       }
-      if (w || t) {
-        const score = (w ?? t!.best).score;
-        p.chips(left, right, scoreChips(score), `${w ? '和牌分數' : '最高和牌分數'}${score.limit ? '（滿貫）' : ''} ${score.total}`);
+      if (w || tp) {
+        const score = (w ?? tp!.best).score;
+        p.chips(left, right, scoreChips(score), `${w ? t('和牌分數') : t('最高和牌分數')}${score.limit ? t('（滿貫）') : ''} ${score.total}`);
         p.y += 6;
       }
     };
@@ -243,8 +244,8 @@ export async function renderHandResult(
     draw();
     p.dry = false;
     const height = p.y - top + 6;
-    p.roundRect(PAD, top, W - 2 * PAD, height, 10, w ? '#fff8f6' : t ? '#f5f9ff' : C.panel);
-    p.roundRect(PAD, top, 5, height, 2, w ? C.win : t ? C.tenpai : '#c9c4b5');
+    p.roundRect(PAD, top, W - 2 * PAD, height, 10, w ? '#fff8f6' : tp ? '#f5f9ff' : C.panel);
+    p.roundRect(PAD, top, 5, height, 2, w ? C.win : tp ? C.tenpai : '#c9c4b5');
     draw();
     p.y = Math.max(p.y, top + height) + 10;
   }
@@ -267,9 +268,9 @@ export async function renderHandResult(
 
 /** 最終結算：排名與各局紀錄 */
 export async function renderFinal(room: RoomView): Promise<HTMLCanvasElement> {
-  const names = room.players.map((x) => x.nickname ?? '-');
+  const names = room.players.map((x) => (x.nickname ? playerName(x) : '-'));
   const p = new Painter(1200 + room.history.length * 60);
-  header(p, room, `共 ${room.history.length} 局`, room.dissolved ? '牌局已解散' : '最終結算');
+  header(p, room, t('共 {n} 局', { n: room.history.length }), room.dissolved ? t('牌局已解散') : t('最終結算'));
   const ranking = [...room.players].sort((a, b) => b.score - a.score);
   const left = PAD + 16;
   const right = W - PAD - 16;
@@ -287,7 +288,7 @@ export async function renderFinal(room: RoomView): Promise<HTMLCanvasElement> {
   p.y += 22;
 
   if (room.history.length) {
-    p.text('各局紀錄', PAD, p.y + 10, { size: 17, weight: 700, color: '#fff' });
+    p.text(t('各局紀錄'), PAD, p.y + 10, { size: 17, weight: 700, color: '#fff' });
     p.y += 28;
     const n = room.players.length;
     const colW = 64;
@@ -296,8 +297,17 @@ export async function renderFinal(room: RoomView): Promise<HTMLCanvasElement> {
     const top = p.y;
     const lines = room.history.map((h) =>
       h.kind === 'draw'
-        ? '流局'
-        : h.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : `銃和（${names[w.from!]}）`} ${w.total}分 ${w.yaku.join('・')}`).join(' / '),
+        ? t('流局')
+        : h.winners
+            .map((w) =>
+              t(w.tsumo ? '{name} 自摸 {total}分 {yaku}' : '{name} 銃和（{from}） {total}分 {yaku}', {
+                name: names[w.seat],
+                from: names[w.from!] ?? '',
+                total: w.total,
+                yaku: w.yaku.map((y) => t(y)).join(t('・')),
+              }),
+            )
+            .join(' / '),
     );
     // 結果文字太長時截斷
     p.font(13);
@@ -310,8 +320,8 @@ export async function renderFinal(room: RoomView): Promise<HTMLCanvasElement> {
     p.roundRect(PAD, top, W - 2 * PAD, rowH2 * (room.history.length + 2) + 12, 10, C.panel);
     p.y += 6;
     const cy = () => p.y + rowH2 / 2;
-    p.text('局', left, cy(), { size: 13, weight: 700, color: C.muted });
-    p.text('結果', left + 36, cy(), { size: 13, weight: 700, color: C.muted });
+    p.text(t('局'), left, cy(), { size: 13, weight: 700, color: C.muted });
+    p.text(t('結果'), left + 36, cy(), { size: 13, weight: 700, color: C.muted });
     names.forEach((nm, i) => p.text(fitTo(p, nm, colW - 6), colX(i), cy(), { size: 13, weight: 700, color: C.muted, align: 'right' }));
     p.y += rowH2;
     room.history.forEach((h, idx) => {
@@ -320,7 +330,7 @@ export async function renderFinal(room: RoomView): Promise<HTMLCanvasElement> {
       h.deltas.forEach((d, i) => p.text(signed(d), colX(i), cy(), { size: 13, weight: 600, color: deltaColor(d), align: 'right' }));
       p.y += rowH2;
     });
-    p.text('合計', left, cy(), { size: 13, weight: 700 });
+    p.text(t('合計'), left, cy(), { size: 13, weight: 700 });
     room.players.forEach((pl) => p.text(String(pl.score), colX(pl.seat), cy(), { size: 13, weight: 800, align: 'right' }));
     p.y += rowH2 + 6;
   }
@@ -337,7 +347,7 @@ function fitTo(p: Painter, s: string, max: number) {
 /** 存成圖片：手機（可分享檔案時）用系統分享，可以存到相簿；其他情況直接下載 */
 export async function saveCanvas(canvas: HTMLCanvasElement, filename: string) {
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
-  if (!blob) throw new Error('無法產生圖片');
+  if (!blob) throw new Error(t('無法產生圖片'));
   const file = new File([blob], filename, { type: 'image/png' });
   const mobile = window.matchMedia?.('(pointer: coarse)').matches;
   if (mobile && navigator.canShare?.({ files: [file] })) {
@@ -364,6 +374,6 @@ export async function exportImage(render: () => Promise<HTMLCanvasElement>, file
   try {
     await saveCanvas(await render(), filename);
   } catch (e) {
-    toast(`匯出圖片失敗：${(e as Error).message}`);
+    toast(t('匯出圖片失敗：{error}', { error: (e as Error).message }));
   }
 }

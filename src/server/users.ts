@@ -54,7 +54,8 @@ export class UserRegistry {
     const u = this.users.get(userId);
     if (!u) return { ok: false, error: '尚未驗證身分' };
     const name = normalizeNickname(raw);
-    if (!name) return { ok: false, error: `暱稱需為 1～${NICKNAME_MAX} 個字` };
+    // 與 NICKNAME_MAX 一致；固定字串，網頁端才能翻譯
+    if (!name) return { ok: false, error: '暱稱需為 1～16 個字' };
     const holder = this.byNickname.get(nicknameKey(name));
     if (holder && holder !== userId) return { ok: false, error: '這個暱稱已經有人使用了' };
     if (u.nickname) this.byNickname.delete(nicknameKey(u.nickname));
