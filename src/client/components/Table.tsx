@@ -134,9 +134,10 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
     }
   } else {
     if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{p.kind === 'chankan' ? '搶槓' : '和'}</button>);
-    if (p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>槓</button>);
-    if (p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>碰</button>);
-    for (const c of p.chi ?? []) {
+    // 不鳴牌：只剩和與略過
+    if (!game.auto.noCall && p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>槓</button>);
+    if (!game.auto.noCall && p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>碰</button>);
+    for (const c of game.auto.noCall ? [] : p.chi ?? []) {
       buttons.push(
         <button key={'chi' + c.join()} className="call chi" onClick={() => act({ type: 'chi', tiles: c })}>
           吃 <Tile tile={c[0]} small />
@@ -220,6 +221,10 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
         <div className="menu-pop" role="menu">
           <button onClick={() => (setShowYaku(true), setOpen(false))}>牌型表</button>
           {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>語音設定</button>}
+          <label className="toggle" title="別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效">
+            <input type="checkbox" checked={game.auto.noCall} onChange={(e) => setAuto({ noCall: e.target.checked })} />
+            不鳴牌（不吃碰槓）
+          </label>
           <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
             <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
             只和最高分

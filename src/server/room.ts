@@ -19,6 +19,8 @@ export interface Seat {
   /** 自動和牌（持續有效） */
   autoWin?: boolean;
   autoOnlyMax?: boolean;
+  /** 不鳴牌：別人打牌時不吃碰槓（自動略過；能和時仍由玩家決定），持續有效 */
+  noCall?: boolean;
   /** 等待中斷線的時間（用於等待房間的清理） */
   offlineSince: number | null;
 }
@@ -403,13 +405,14 @@ export class Room {
     return ok;
   }
 
-  setAuto(userId: string, on: boolean, win: boolean, onlyMax: boolean): RoomResult {
+  setAuto(userId: string, on: boolean, win: boolean, onlyMax: boolean, noCall = false): RoomResult {
     const seat = this.seatOf(userId);
     if (seat < 0) return fail('不在房間中');
     const s = this.seats[seat]!;
     s.autoPlay = on;
     s.autoWin = win;
     s.autoOnlyMax = onlyMax;
+    s.noCall = noCall;
     this.afterChange();
     return ok;
   }
@@ -606,7 +609,7 @@ export class Room {
 
   private autoOpts(seat: number) {
     const s = this.seats[seat];
-    return { play: !!s?.autoPlay, win: !!s?.autoWin, onlyMax: s?.autoOnlyMax ?? true };
+    return { play: !!s?.autoPlay, win: !!s?.autoWin, onlyMax: s?.autoOnlyMax ?? true, noCall: !!s?.noCall };
   }
 
   private runAuto(seat: number, wid: string) {
@@ -729,7 +732,9 @@ export class Room {
       passReceived: mine ? hand.passReceived[seat] : null,
       myWaits: mine ? hand.waitsFor(seat) : [],
       myWaitScore: mine ? hand.waitScore(seat) : null,
-      auto: mine ? { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true } : { on: false, win: false, onlyMax: true },
+      auto: mine
+        ? { on: !!this.seats[seat]!.autoPlay, win: !!this.seats[seat]!.autoWin, onlyMax: this.seats[seat]!.autoOnlyMax ?? true, noCall: !!this.seats[seat]!.noCall }
+        : { on: false, win: false, onlyMax: true, noCall: false },
       thinkAvailable:
         mine &&
         !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,

@@ -401,6 +401,8 @@ describe('情境', () => {
     h2.act(2, { type: 'discard', tile: tileOf(h2, 2, '🀡') });
     expect(h2.pending.get(3)?.minkan).toBe(true);
     expect(autoAction(h2, 3, { play: true, win: false, onlyMax: false })).toBeNull();
+    // 不鳴牌：只能槓（不能和）時自動略過，沒開自動摸打也一樣
+    expect(autoAction(h2, 3, { play: false, win: false, onlyMax: false, noCall: true })).toEqual({ type: 'pass' });
   });
 
   it('自動和牌（沒開自動摸打）：只有能和時才自動，其他交給玩家', () => {
@@ -415,6 +417,8 @@ describe('情境', () => {
     // 只和最高分：銃和 10 分 < 最高 15 分 → 交給玩家（不自動略過）
     expect(autoAction(h, 1, { ...winOnly, onlyMax: true })).toBeNull();
     expect(autoAction(h, 1, { play: false, win: false, onlyMax: false })).toBeNull();
+    // 不鳴牌：能和（也能碰）時不自動略過，交給玩家
+    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false, noCall: true })).toBeNull();
   });
 
   it('聽牌預計得分：所有聽的牌 × 自摸／銃和的最低與最高；未達和牌最低分數的不列入', () => {

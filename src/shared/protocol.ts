@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 // ---- 遊戲行動 ----
 
@@ -136,8 +136,8 @@ export interface GameView {
   myWaitScore: { min: number; max: number } | null;
   /** 這一局還能按「長考」延長打牌時限（每局一次） */
   thinkAvailable: boolean;
-  /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者下一局都會自動關閉） */
-  auto: { on: boolean; win: boolean; onlyMax: boolean };
+  /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者下一局都會自動關閉）、noCall = 不鳴牌（持續有效） */
+  auto: { on: boolean; win: boolean; onlyMax: boolean; noCall: boolean };
   result: HandResultView | null;
   /** 小牌限制：本輪是否還能和小牌 */
   smallHandAvailable: boolean[];
@@ -208,8 +208,8 @@ export type ClientMessage =
   | { t: 'ready'; ready: boolean }
   /** 房主開始牌局 */
   | { t: 'start' }
-  /** 自動摸打、自動和牌（下一局都會自動關閉）；onlyMax = 只和這副聽牌的最高分（預設開啟） */
-  | { t: 'setAuto'; on: boolean; win: boolean; onlyMax: boolean }
+  /** 自動摸打、自動和牌（下一局都會自動關閉）；onlyMax = 只和這副聽牌的最高分（預設開啟）；noCall = 不鳴牌（不吃碰槓，持續有效） */
+  | { t: 'setAuto'; on: boolean; win: boolean; onlyMax: boolean; noCall?: boolean }
   /** 房主調整電腦難度（等待中或牌局中皆可，立即生效） */
   | { t: 'setAILevel'; level: AILevel }
   /** 局結束時展示自己的手牌 */
