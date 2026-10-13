@@ -219,7 +219,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       case 'think':
         return reply(c, room.think(userId));
       case 'setAuto':
-        return reply(c, room.setAuto(userId, !!msg.on, !!msg.win, !!msg.onlyMax, !!msg.noCall));
+        return reply(c, room.setAuto(userId, !!msg.on, !!msg.win, !!msg.noCall));
       case 'action':
         if (!msg.action || typeof msg.action !== 'object') return;
         return reply(c, room.action(userId, Number(msg.handNo), msg.action));

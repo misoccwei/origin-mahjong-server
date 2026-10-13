@@ -75,7 +75,7 @@ export function game(patch: Partial<GameView> = {}): GameView {
     passReceived: null,
     myWaits: [],
     myWaitScore: null,
-    auto: { on: false, win: false, onlyMax: true, noCall: false },
+    auto: { on: false, win: false, noCall: false },
     thinkAvailable: false,
     result: null,
     smallHandAvailable: [true, true, true, true],

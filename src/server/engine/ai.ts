@@ -286,8 +286,6 @@ export interface AutoOptions {
   play: boolean;
   /** 自動和牌 */
   win: boolean;
-  /** 只和這副聽牌的最高分 */
-  onlyMax: boolean;
   /** 不鳴牌：別人打牌時不吃碰槓 */
   noCall?: boolean;
 }
@@ -296,7 +294,7 @@ export interface AutoOptions {
  * 自動操作。回傳 null 表示交給玩家自己決定：
  * - 只開自動和牌時，除了和牌以外都由玩家操作；
  * - 自動摸打遇到能槓（暗槓、加槓、明槓）時也停下來問玩家。
- * 自動摸打或自動和牌任一開啟時，可以和就和（onlyMax 時只和這副聽牌的最高分）。
+ * 自動摸打或自動和牌任一開啟時，和牌分數達到這副聽牌的最高分才自動和；沒達到時交給玩家確認。
  * 不鳴牌時，別人打牌只能吃碰槓（不能和）就自動略過。
  */
 export function autoAction(hand: Hand, seat: number, opts: AutoOptions): GameAction | null {
@@ -304,8 +302,7 @@ export function autoAction(hand: Hand, seat: number, opts: AutoOptions): GameAct
   if (!avail) throw new Error('no pending action');
   if (opts.play || opts.win) {
     const preview = avail.tsumo || avail.ron ? hand.winPreview(seat) : null;
-    const takeWin = !!preview && (!opts.onlyMax || preview.score.total >= preview.best);
-    if (takeWin) return { type: avail.kind === 'turn' ? 'tsumo' : 'ron' };
+    if (preview) return preview.score.total >= preview.best ? { type: avail.kind === 'turn' ? 'tsumo' : 'ron' } : null;
   }
   // 不鳴牌：只能吃碰槓的時候直接略過；能和的話仍交給玩家
   if (opts.noCall && avail.kind === 'claim' && !avail.ron) return { type: 'pass' };

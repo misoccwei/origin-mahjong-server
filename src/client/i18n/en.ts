@@ -162,7 +162,6 @@ export const en: Record<string, string> = {
   '語音設定': 'Voice settings',
   '別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效':
     'Never chi/pon/kan on discards (auto-skip; still asks when you can win). Stays on until turned off.',
-  '只和最高分': 'Only win at max score',
   '離開全螢幕': 'Exit full screen',
   '全螢幕': 'Full screen',
   '牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？':

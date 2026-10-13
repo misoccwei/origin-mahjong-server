@@ -111,12 +111,17 @@ export async function waitMyTurn(c: Client) {
   });
 }
 
-/** 自動摸打遇到能槓時會停下來問玩家；測試裡一律回答「不槓」（摸切或略過），否則沒有時限時會卡住 */
-export function answerKan(c: Client) {
+/**
+ * 自動摸打遇到能槓、或和牌沒達到這副聽牌的最高分時會停下來問玩家；
+ * 測試裡一律回答「和」或「不槓」（摸切或略過），否則沒有時限時會卡住
+ */
+export function answerAutoStop(c: Client) {
   const g = c.game;
   const p = g?.pending;
   if (!g || !p) return;
-  if (p.kind === 'turn' && (p.ankan?.length || p.kakan?.length) && g.myDrawn !== null) {
+  if (p.tsumo || p.ron) {
+    c.send({ t: 'action', handNo: g.handNo, action: { type: p.tsumo ? 'tsumo' : 'ron' } });
+  } else if (p.kind === 'turn' && (p.ankan?.length || p.kakan?.length) && g.myDrawn !== null) {
     c.send({ t: 'action', handNo: g.handNo, action: { type: 'discard', tile: g.myDrawn } });
   } else if (p.kind === 'claim' && p.minkan && !p.ron) {
     c.send({ t: 'action', handNo: g.handNo, action: { type: 'pass' } });

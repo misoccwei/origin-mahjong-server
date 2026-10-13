@@ -7,49 +7,56 @@ import { S0, autoplayUntil, buildWall, makeHand, tileOf } from '../../support/ha
 import { uni } from '../../support/tiles.js';
 
 describe('自動摸打／自動和牌', () => {
-  it('自動摸打：摸切、不鳴牌；只和最高分時放過較低分的和牌', () => {
+  it('自動摸打：摸切、不鳴牌；和牌沒達到這副聽牌的最高分時交給玩家確認', () => {
     // 座位 1：234m 678m 456s 33p 55p 對碰。銃和 3p → 該刻子為明刻（10 分）；自摸可多一暗刻（15 分）
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
+    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛🀝') });
     h.start();
     h.drawCount[1] = 1; // 避免成立地和
-    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toEqual({ type: 'discard', tile: h.drawn });
+    expect(autoAction(h, 0, { play: true, win: false })).toEqual({ type: 'discard', tile: h.drawn });
     h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
     expect(h.pending.get(1)?.ron).toBe(true);
     expect(h.winPreview(1)).toMatchObject({ score: { total: 10 }, best: 15 });
-    expect(autoAction(h, 1, { play: true, win: false, onlyMax: false })).toEqual({ type: 'ron' });
-    expect(autoAction(h, 1, { play: true, win: false, onlyMax: true })).toEqual({ type: 'pass' });
+    expect(autoAction(h, 1, { play: true, win: false })).toBeNull();
+    // 不和的話，接著自摸 🀝 是最高分 15 分 → 自動自摸
+    h.act(1, { type: 'pass' });
+    autoplayUntil(h, () => h.current === 1 && h.phase === 'turn');
+    expect(h.winPreview(1)).toMatchObject({ score: { total: 15 }, best: 15 });
+    expect(autoAction(h, 1, { play: true, win: false })).toEqual({ type: 'tsumo' });
   });
 
   it('自動摸打：能暗槓或明槓時停下來交給玩家決定（回傳 null）', () => {
     // 座位 0 手上三張 🀇、摸到第四張 → 可暗槓
     const h = makeHand(['🀇🀇🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀚', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀇');
     expect(h.pending.get(0)?.ankan).toEqual([uni('🀇')[0]]);
-    expect(autoAction(h, 0, { play: true, win: false, onlyMax: false })).toBeNull();
+    expect(autoAction(h, 0, { play: true, win: false })).toBeNull();
     // 座位 3 有三張 🀡：座位 2 打出 🀡 時可明槓
     const h2 = makeHand(['🀀🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀔🀕', '🀈🀉🀊🀌🀍🀎🀛🀛🀛🀚🀓🀔🀕', '🀡🀇🀇🀈🀈🀉🀉🀙🀚🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀆🀁');
     autoplayUntil(h2, () => h2.current === 2 && h2.phase === 'turn');
     h2.act(2, { type: 'discard', tile: tileOf(h2, 2, '🀡') });
     expect(h2.pending.get(3)?.minkan).toBe(true);
-    expect(autoAction(h2, 3, { play: true, win: false, onlyMax: false })).toBeNull();
+    expect(autoAction(h2, 3, { play: true, win: false })).toBeNull();
     // 不鳴牌：只能槓（不能和）時自動略過，沒開自動摸打也一樣
-    expect(autoAction(h2, 3, { play: false, win: false, onlyMax: false, noCall: true })).toEqual({ type: 'pass' });
+    expect(autoAction(h2, 3, { play: false, win: false, noCall: true })).toEqual({ type: 'pass' });
   });
 
-  it('自動和牌（沒開自動摸打）：只有能和時才自動，其他交給玩家', () => {
+  it('自動和牌（沒開自動摸打）：只有能和最高分時才自動，其他交給玩家', () => {
     const hands = [S0, '🀈🀉🀊🀌🀍🀎🀓🀔🀕🀛🀛🀝🀝', '🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀜🀝🀞', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'];
-    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛') });
+    const h = new Hand({ settings: { ...defaultSettings(4), minWinScore: 0, passThree: false }, startSeat: 0, smallHandAvailable: [true, true, true, true], wall: buildWall(4, 0, hands, '🀛🀝') });
     h.start();
     h.drawCount[1] = 1;
-    const winOnly = { play: false, win: true, onlyMax: false };
+    const winOnly = { play: false, win: true };
     expect(autoAction(h, 0, winOnly)).toBeNull(); // 輪到自己打牌：不自動
     h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀛') });
-    expect(autoAction(h, 1, winOnly)).toEqual({ type: 'ron' });
-    // 只和最高分：銃和 10 分 < 最高 15 分 → 交給玩家（不自動略過）
-    expect(autoAction(h, 1, { ...winOnly, onlyMax: true })).toBeNull();
-    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false })).toBeNull();
+    // 銃和 10 分 < 最高 15 分 → 交給玩家確認（不自動和、也不自動略過）
+    expect(autoAction(h, 1, winOnly)).toBeNull();
+    expect(autoAction(h, 1, { play: false, win: false })).toBeNull();
     // 不鳴牌：能和（也能碰）時不自動略過，交給玩家
-    expect(autoAction(h, 1, { play: false, win: false, onlyMax: false, noCall: true })).toBeNull();
+    expect(autoAction(h, 1, { play: false, win: false, noCall: true })).toBeNull();
+    // 不和，接著自摸 🀝 是最高分 → 自動自摸
+    h.act(1, { type: 'pass' });
+    autoplayUntil(h, () => h.current === 1 && h.phase === 'turn');
+    expect(autoAction(h, 1, winOnly)).toEqual({ type: 'tsumo' });
   });
 });
 

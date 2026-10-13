@@ -26,7 +26,7 @@ describe('牌桌畫面', () => {
   });
 
   it('工具列：推薦、自動和、自動打、不鳴牌（開啟時高亮）；⚙ 選單在右上與局數放在一起', () => {
-    const html = render(room(), game({ auto: { on: true, win: false, onlyMax: false, noCall: false } }));
+    const html = render(room(), game({ auto: { on: true, win: false, noCall: false } }));
     expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動打/);
     expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和</);
     expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>不鳴牌</);
@@ -120,12 +120,12 @@ describe('牌桌畫面', () => {
 
   it('自動摸打遇到能槓時，問玩家要不要槓（有「不槓（摸切）」）', () => {
     const drawn = tid(0, 3);
-    const g = game({ myHand: [...HAND, drawn], myDrawn: drawn, auto: { on: true, win: false, onlyMax: false, noCall: false }, pending: { kind: 'turn', discard: [...HAND, drawn], ankan: [0] } });
+    const g = game({ myHand: [...HAND, drawn], myDrawn: drawn, auto: { on: true, win: false, noCall: false }, pending: { kind: 'turn', discard: [...HAND, drawn], ankan: [0] } });
     const html = render(room(), g);
     expect(html).toContain('暗槓');
     expect(html).toContain('不槓（摸切）');
     // 沒開自動摸打時不需要這顆按鈕（直接打牌就是不槓）
-    expect(render(room(), { ...g, auto: { on: false, win: false, onlyMax: false, noCall: false } })).not.toContain('不槓');
+    expect(render(room(), { ...g, auto: { on: false, win: false, noCall: false } })).not.toContain('不槓');
   });
 
   it('聽牌時在手牌上方顯示聽的牌、剩餘張數與預計得分（同分只寫一個）', () => {

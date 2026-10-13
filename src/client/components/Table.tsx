@@ -295,7 +295,7 @@ function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
   );
 }
 
-/** ⚙ 選單（右上角）：較少用的設定（牌型表、只和最高分、電腦難度、語言、全螢幕、離開） */
+/** ⚙ 選單（右上角）：較少用的設定（牌型表、語音設定、電腦難度、語言、全螢幕、離開） */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
   const [showYaku, setShowYaku] = useState(false);
@@ -332,10 +332,6 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
         <div className="menu-pop" role="menu">
           <button onClick={() => (setShowYaku(true), setOpen(false))}>{t('牌型表')}</button>
           {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>{t('語音設定')}</button>}
-          <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
-            <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
-            {t('只和最高分')}
-          </label>
           {room.players.some((p) => p.isAI || p.aiControlled) && (
             <label className="toggle">
               {t('電腦')}

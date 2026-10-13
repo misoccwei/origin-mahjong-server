@@ -65,11 +65,13 @@ describe('結算倒數', () => {
     for (let i = 0; i < 3; i++) room.addAI('me');
     room.start('me');
     for (let i = 0; i < 5000 && room.match!.hand?.phase !== 'ended'; i++) {
-      // 自動摸打只維持一局，而且遇到能槓會停下來問：這裡每一步都重新打開，能槓時直接摸切
-      room.setAuto('me', true, true, false);
+      // 自動摸打只維持一局，而且遇到能槓、沒達最高分的和牌會停下來問：這裡每一步都重新打開，能和就和、能槓時直接摸切
+      room.setAuto('me', true, true);
       const hand = room.match!.hand!;
       const p = hand.pending.get(0);
-      if (p?.kind === 'turn' && (p.ankan?.length || p.kakan?.length)) room.action('me', 1, { type: 'discard', tile: hand.drawn ?? hand.hands[0][0] });
+      if (p?.tsumo) room.action('me', 1, { type: 'tsumo' });
+      else if (p?.ron) room.action('me', 1, { type: 'ron' });
+      else if (p?.kind === 'turn' && (p.ankan?.length || p.kakan?.length)) room.action('me', 1, { type: 'discard', tile: hand.drawn ?? hand.hands[0][0] });
       else if (p?.kind === 'claim' && p.minkan && !p.ron) room.action('me', 1, { type: 'pass' });
       vi.advanceTimersByTime(1);
     }

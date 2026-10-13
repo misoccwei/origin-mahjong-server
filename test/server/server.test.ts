@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/server/server.js';
 import { PROTOCOL_VERSION } from '../../src/shared/protocol.js';
-import { Client, answerKan, newKey, waitMyTurn, type KeyPair } from '../support/wsClient.js';
+import { Client, answerAutoStop, newKey, waitMyTurn, type KeyPair } from '../support/wsClient.js';
 
 let server: RunningServer;
 const clients: Client[] = [];
@@ -350,11 +350,11 @@ describe('對局', () => {
     await host.waitFor(() => host.room);
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    host.send({ t: 'setAuto', on: true, win: false, onlyMax: false });
+    host.send({ t: 'setAuto', on: true, win: false });
     await host.waitFor(() => host.room?.players[0].autoPlay);
     host.send({ t: 'start' });
     await host.waitFor(() => host.game?.phase === 'passReveal');
-    await host.waitFor(() => (answerKan(host), host.game?.auto.on && host.game.phase === 'result'), 20000);
+    await host.waitFor(() => (answerAutoStop(host), host.game?.auto.on && host.game.phase === 'result'), 20000);
   });
 
   it('電腦難度：只有房主能改，立即生效且不重設準備；牌局中也能改', async () => {
@@ -383,9 +383,9 @@ describe('對局', () => {
     await host.waitFor(() => host.room);
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    host.send({ t: 'setAuto', on: true, win: false, onlyMax: false });
+    host.send({ t: 'setAuto', on: true, win: false });
     host.send({ t: 'start' });
-    const g = await host.waitFor(() => (answerKan(host), host.game?.phase === 'result' && host.game), 20000);
+    const g = await host.waitFor(() => (answerAutoStop(host), host.game?.phase === 'result' && host.game), 20000);
     const r = g.result!;
     const visible = (s: number) => s === 0 || r.winners.some((w) => w.seat === s) || r.tenpai.some((t) => t.seat === s);
     expect(r.hands[1].length > 0).toBe(visible(1));
@@ -487,10 +487,10 @@ describe('對局', () => {
     await host.waitFor(() => host.room);
     host.send({ t: 'addAI' });
     await host.waitFor(() => host.room?.players[1].nickname);
-    host.send({ t: 'setAuto', on: true, win: true, onlyMax: false, noCall: true });
+    host.send({ t: 'setAuto', on: true, win: true, noCall: true });
     host.send({ t: 'start' });
     await host.waitFor(() => host.game?.auto.on && host.game.auto.win && host.game.auto.noCall && host.game);
-    await host.waitFor(() => (answerKan(host), host.game?.phase === 'result'), 20000);
+    await host.waitFor(() => (answerAutoStop(host), host.game?.phase === 'result'), 20000);
     host.send({ t: 'nextHand' });
     const g2 = await host.waitFor(() => host.game?.handNo === 2 && host.game);
     expect(g2.auto.on).toBe(false);
@@ -507,7 +507,6 @@ describe('對局', () => {
     host.send({ t: 'start' });
     const g = await waitMyTurn(host);
     expect(g.thinkAvailable).toBe(true);
-    expect(g.auto.onlyMax).toBe(true); // 只和最高分預設開啟
     const before = g.deadline!;
     host.send({ t: 'think' });
     const after = await host.waitFor(() => ((host.game?.deadline ?? 0) > before + 50_000 ? host.game : null));
