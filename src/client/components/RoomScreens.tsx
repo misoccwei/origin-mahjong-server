@@ -5,6 +5,8 @@ import { send, toast } from '../net.js';
 import { AI_LEVEL_LABEL, AILevelSelect } from './Inputs.js';
 import { SettingsForm } from './Lobby.js';
 import { VoicePanel } from './Voice.js';
+import { ExportButton } from './ExportButton.js';
+import { renderFinal } from '../exportImage.js';
 
 function rulesSummary(s: RuleSettings) {
   return [
@@ -153,6 +155,7 @@ export function FinalScreen({ room }: { room: RoomView }) {
           {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>加一圈</button>}
           {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>以 AI 補上空位</button>}
           {isHost && <button onClick={() => send({ t: 'restart' })}>回到房間重新開始</button>}
+          <ExportButton render={() => renderFinal(room)} filename={`原點麻將-${room.id}-結算.png`} />
           <button onClick={() => send({ t: 'leaveRoom' })}>{me === null ? '離開觀戰' : '離開房間'}</button>
         </div>
         <SpectatorList room={room} />

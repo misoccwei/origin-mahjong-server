@@ -480,3 +480,7 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 @media (max-width: 420px) {
   .table.portrait .spectator-tools { flex-wrap: wrap; }
 }
+
+/* ---- 結算匯出圖片 ---- */
+.result-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.result-actions .primary { flex: 1; }

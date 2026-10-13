@@ -10,6 +10,8 @@ import { kindLabel, Tile } from './Tile.js';
 import { useVoice } from '../voice.js';
 import { VoiceButtons, VoiceMark, VoiceSettings } from './Voice.js';
 import { YakuTable } from './YakuTable.js';
+import { ExportButton } from './ExportButton.js';
+import { renderHandResult } from '../exportImage.js';
 
 const WIND = ['東', '南', '西', '北'];
 const windLabel = (k: TileKind | null) => (k === null ? '' : WIND[k - 27]);
@@ -738,14 +740,17 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
             ))}
           </tbody>
         </table>
-        {me === null ? (
-          <p className="muted small">觀戰中：等待玩家進入下一局{remain !== null ? `（${remain}）` : ''}</p>
-        ) : (
-          <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
-            {acked ? '等待其他玩家…' : game.handNo >= game.totalHands ? '查看結算' : '下一局'}
-            {remain !== null ? `（${remain}）` : ''}
-          </button>
-        )}
+        <div className="result-actions">
+          {me === null ? (
+            <p className="muted small">觀戰中：等待玩家進入下一局{remain !== null ? `（${remain}）` : ''}</p>
+          ) : (
+            <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
+              {acked ? '等待其他玩家…' : game.handNo >= game.totalHands ? '查看結算' : '下一局'}
+              {remain !== null ? `（${remain}）` : ''}
+            </button>
+          )}
+          <ExportButton render={() => renderHandResult(room, game)} filename={`原點麻將-${room.id}-第${game.handNo}局.png`} />
+        </div>
       </div>
     </div>
   );

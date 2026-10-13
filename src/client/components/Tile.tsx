@@ -5,7 +5,7 @@ const HONOR_FILES = ['Ton', 'Nan', 'Shaa', 'Pei', 'Chun', 'Hatsu', 'Haku'];
 
 export const kindLabel = tileName;
 
-function faceUrl(k: TileKind) {
+export function faceUrl(k: TileKind) {
   const name = k < 27 ? ['Man', 'Pin', 'Sou'][suitOf(k)] + numOf(k) : HONOR_FILES[k - 27];
   return `/tiles/${name}.svg`;
 }
