@@ -9,12 +9,23 @@ interface Part {
   pair: number; // 0/1，作為雀頭的對子
 }
 
-const cache = new Map<string, Part[]>();
+// 每段（一種花色或字牌）的拆法依張數快取；key 用 5 進位整數（每種牌 0～4 張），不用產生字串
+const seqCache = new Map<number, Part[]>();
+const honorCache = new Map<number, Part[]>();
+
+/** counts[start, start + len) 這一段的拆法 */
+function partsAt(counts: number[], start: number, len: number, allowSeq: boolean): Part[] {
+  let key = 0;
+  for (let i = 0; i < len; i++) key = key * 5 + counts[start + i];
+  const cache = allowSeq ? seqCache : honorCache;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const parts = partsFor(counts.slice(start, start + len), allowSeq);
+  cache.set(key, parts);
+  return parts;
+}
 
 function partsFor(c: number[], allowSeq: boolean): Part[] {
-  const key = (allowSeq ? 's' : 'h') + c.join('');
-  const hitPart = cache.get(key);
-  if (hitPart) return hitPart;
   const found = new Map<string, Part>();
   const n = c.length;
   const dfs = (i: number, sets: number, taatsu: number, pair: number) => {
@@ -59,29 +70,34 @@ function partsFor(c: number[], allowSeq: boolean): Part[] {
   const parts = all.filter(
     (a) => !all.some((b) => b !== a && b.sets >= a.sets && b.taatsu >= a.taatsu && b.pair >= a.pair && (b.sets > a.sets || b.taatsu > a.taatsu || b.pair > a.pair)),
   );
-  cache.set(key, parts);
   return parts;
 }
 
-export function shantenStandard(counts: number[], meldCount: number): number {
-  const groups = [
-    partsFor(counts.slice(0, 9), true),
-    partsFor(counts.slice(9, 18), true),
-    partsFor(counts.slice(18, 27), true),
-    partsFor(counts.slice(27, 34), false),
-  ];
+/**
+ * 一般形（四面子一雀頭）的向聽數。
+ * 張數不足 13 張時（例如只看某些牌種）也正確：缺的面子或雀頭沒有孤張可以用時要多摸一張。
+ * pairFixed：雀頭已經由別處提供（例如小三元的三元牌對子），這裡只需要湊面子。
+ */
+export function shantenStandard(counts: number[], meldCount: number, pairFixed = false): number {
+  const groups = [partsAt(counts, 0, 9, true), partsAt(counts, 9, 9, true), partsAt(counts, 18, 9, true), partsAt(counts, 27, 7, false)];
+  let total = 0;
+  for (const n of counts) total += n;
   let best = 8;
   const need = 4 - meldCount;
   const rec = (g: number, sets: number, taatsu: number, pair: number) => {
     if (g === 4) {
       const s = Math.min(sets, need);
       const t = Math.min(taatsu, need - s);
-      best = Math.min(best, 8 - 2 * (s + meldCount) - t - pair);
+      const p = pairFixed ? 1 : pair;
+      // 標準公式假設每個還沒有搭子的面子（和雀頭）都有一張孤張可用；孤張不夠時每缺一張多摸一次
+      const isolated = total - 3 * s - 2 * t - (pairFixed ? 0 : 2 * pair);
+      const deficit = Math.max(0, need - s - t + (1 - p) - isolated);
+      best = Math.min(best, 8 - 2 * (s + meldCount) - t - p + deficit);
       return;
     }
-    for (const p of groups[g]) {
-      if (pair + p.pair > 1) continue;
-      rec(g + 1, sets + p.sets, taatsu + p.taatsu, pair + p.pair);
+    for (const part of groups[g]) {
+      if (pair + part.pair > (pairFixed ? 0 : 1)) continue;
+      rec(g + 1, sets + part.sets, taatsu + part.taatsu, pair + part.pair);
     }
   };
   rec(0, 0, 0, 0);
