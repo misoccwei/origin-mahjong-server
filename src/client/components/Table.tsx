@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
 import type { HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
-import type { Meld } from '../../shared/rules.js';
+import { baseScoreFor, type Meld } from '../../shared/rules.js';
 import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
 import { AILevelSelect } from './Inputs.js';
@@ -483,7 +483,19 @@ function recommendInput(room: RoomView, game: GameView) {
     for (const m of p.melds) for (const t of m.tiles) if (t >= 0) visible[kindOf(t)]++;
     for (const d of p.discards) if (!d.called) visible[kindOf(d.tile)]++;
   }
-  return { concealed: game.myHand.map(kindOf), melds: me.melds, seatWind: me.wind ?? 27, advanced: room.settings.advanced, visible };
+  const n = room.players.length;
+  return {
+    concealed: game.myHand.map(kindOf),
+    melds: me.melds,
+    seatWind: me.wind ?? 27,
+    advanced: room.settings.advanced,
+    visible,
+    // 自己大約還能摸幾次：牌山剩下的牌平均分給每家
+    drawsLeft: Math.floor(Math.max(0, game.wallRemaining - game.deadWall) / n),
+    playerCount: n,
+    baseScore: baseScoreFor(room.settings, me.seat),
+    minWinScore: room.settings.minWinScore,
+  };
 }
 
 /** 直式資訊卡「提示」分頁的補充：現在輪到誰，以及沒聽牌時的牌效率 */
@@ -529,7 +541,7 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
   const { recs, fast } = useMemo(() => {
     const input = recommendInput(room, game);
     return { recs: recommendYaku(input), fast: fastestWin(input) };
-  }, [game.myHand, room.players, me.melds, me.wind, room.settings.advanced]);
+  }, [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
   return (
     <aside className={`reco-panel ${mode}`}>
       {mode === 'beside' && (
@@ -552,27 +564,40 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
           </div>
         )}
       </div>
-      {recs.length === 0 && <p className="muted small">目前沒有推薦</p>}
-      <ol>
-        {recs.map((r) => (
-          <li key={r.id}>
-            <div className="reco-title">
-              <span>{r.name}</span>
-              <span className="pts">{r.points} 分</span>
-            </div>
-            <div className="small muted">
-              {shantenText(r.shanten)}・有效牌 {r.ukeire} 張
-            </div>
-            {r.discard !== undefined && (
-              <div className="reco-discard">
-                <span className="small muted">朝這個牌型打</span>
-                <Tile kind={r.discard} small />
-              </div>
-            )}
-          </li>
-        ))}
-      </ol>
-      <p className="small muted">依牌效率（向聽數與有效牌）估計，部分牌型為近似值，僅供參考。</p>
+      {recs.length === 0 && <p className="muted small">目前沒有推薦{room.settings.minWinScore > 0 ? '（已排除未達和牌最低分數的牌型）' : ''}</p>}
+      {/* 依期望值排序；分成可以吃碰做牌的，以及只能自己摸進來（門清）的 */}
+      {([true, false] as const).map((callable) => {
+        const group = recs.filter((r) => r.callable === callable);
+        if (!group.length) return null;
+        return (
+          <section key={String(callable)} className="reco-group">
+            <div className="reco-group-title small">{callable ? '可吃碰' : '門清（只能自己摸進來）'}</div>
+            <ol>
+              {group.map((r) => (
+                <li key={r.id}>
+                  <div className="reco-title">
+                    <span>{r.name}</span>
+                    <span className="pts">{r.points} 分</span>
+                  </div>
+                  <div className="small muted">
+                    {shantenText(r.shanten)}・有效牌 {r.ukeire} 張
+                  </div>
+                  <div className="small reco-ev">
+                    和牌率 {Math.round(r.winRate * 100)}%・期望 {r.ev.toFixed(1)} 分
+                  </div>
+                  {r.discard !== undefined && (
+                    <div className="reco-discard">
+                      <span className="small muted">朝這個牌型打</span>
+                      <Tile kind={r.discard} small />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+        );
+      })}
+      <p className="small muted">依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），部分牌型為近似值，僅供參考。</p>
     </aside>
   );
 }

@@ -393,6 +393,9 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .reco-fast { border: 1px solid #e2dccb; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
 .reco-panel ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .reco-panel li { border-bottom: 1px solid #e7e2d3; padding-bottom: 6px; }
+.reco-group { display: grid; gap: 6px; margin-top: 8px; }
+.reco-group-title { font-weight: 700; color: var(--gold); }
+.reco-ev { font-weight: 600; font-variant-numeric: tabular-nums; }
 .reco-title { display: flex; justify-content: space-between; font-weight: 600; }
 .reco-title .pts { color: var(--accent); }
 .reco-discard { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 4px; }

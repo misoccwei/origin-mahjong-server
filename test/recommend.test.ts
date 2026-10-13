@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fastestWin, recommendYaku } from '../src/shared/recommend.js';
+import { fastestWin, recommendYaku, winProbability } from '../src/shared/recommend.js';
 import { EAST, isHonor, suitOf } from '../src/shared/tiles.js';
 import { meld, uni } from './helpers.js';
 
@@ -9,9 +9,9 @@ const rec = (hand: string, advanced = true, melds = [] as ReturnType<typeof meld
 describe('推薦牌型（牌效率）', () => {
   it('筒子加字牌為主的手牌推薦混一色／清一色，並附有效牌張數', () => {
     const r = rec('🀙🀚🀛🀜🀝🀟🀠🀡🀆🀆🀆🀇🀐');
-    expect(r[0].name).toMatch(/混一色|清一色/);
-    expect(r[0].ukeire).toBeGreaterThan(0);
-    expect(r.find((x) => x.name === '混一色')).toBeDefined();
+    const half = r.find((x) => x.name === '混一色')!;
+    expect(r.indexOf(half)).toBeLessThan(2);
+    expect(half.ukeire).toBeGreaterThan(0);
   });
 
   it('輪到自己（多一張）時，朝混一色建議打掉其他花色的牌', () => {
@@ -51,5 +51,32 @@ describe('推薦牌型（牌效率）', () => {
     const names = rec('🀙🀚🀛🀜🀝🀟🀠🀡🀆🀆', true, [meld('🀇🀈🀉')]).map((x) => x.name);
     expect(names).not.toContain('清一色');
     expect(names).not.toContain('碰碰和');
+  });
+
+  it('依期望值排序，並標出可吃碰或門清牌型', () => {
+    const r = rec('🀇🀇🀋🀋🀎🀎🀙🀙🀟🀟🀘🀀🀂');
+    for (let i = 1; i < r.length; i++) expect(r[i - 1].ev).toBeGreaterThanOrEqual(r[i].ev);
+    expect(r.find((x) => x.name === '七對子')!.callable).toBe(false);
+    expect(r.filter((x) => x.callable).length).toBeGreaterThan(0);
+    for (const x of r) expect(x.ev).toBeCloseTo(x.winRate * x.points);
+  });
+
+  it('未達和牌最低分數的牌型不推薦', () => {
+    const r = recommendYaku({ ...input('🀙🀚🀛🀜🀝🀟🀠🀡🀆🀆🀆🀇🀐'), minWinScore: 40 });
+    expect(r.length).toBeGreaterThan(0);
+    expect(r.every((x) => x.points >= 40)).toBe(true);
+    // 底分（讓分）會加進去
+    const withBase = recommendYaku({ ...input('🀙🀚🀛🀜🀝🀟🀠🀡🀆🀆🀆🀇🀐'), minWinScore: 40, baseScore: 30 }, 20);
+    expect(withBase.some((x) => x.points < 40)).toBe(true);
+  });
+
+  it('和牌率：剩餘巡數越多、有效牌越多越高；可吃碰的牌型高於門清', () => {
+    const p = (s: number, u: number, d: number, callable = true) => winProbability(s, u, 100, d, callable);
+    expect(p(-1, 0, 0)).toBe(1);
+    expect(p(1, 0, 10)).toBe(0);
+    expect(p(1, 10, 15)).toBeGreaterThan(p(1, 10, 5));
+    expect(p(1, 20, 10)).toBeGreaterThan(p(1, 10, 10));
+    expect(p(2, 20, 10)).toBeLessThan(p(1, 20, 10));
+    expect(p(2, 20, 10, true)).toBeGreaterThan(p(2, 20, 10, false));
   });
 });
