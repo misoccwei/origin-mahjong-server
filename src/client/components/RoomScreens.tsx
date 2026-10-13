@@ -16,6 +16,7 @@ function rulesSummary(s: RuleSettings) {
     s.minWinScore > 0 && `最低 ${s.minWinScore} 分`,
     `電腦${AI_LEVEL_LABEL[s.aiLevel]}`,
     s.passThree && '換三張',
+    s.randomSeats && '隨機座位',
     s.smallHandLimit && '小牌限制',
   ]
     .filter(Boolean)

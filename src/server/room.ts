@@ -311,6 +311,7 @@ export class Room {
     if (!this.seats.every((s) => s !== null)) return fail('座位還沒坐滿');
     const allReady = this.seats.every((s, i) => s && (s.isAI || i === this.hostSeat || (s.ready && this.isOnlineSeat(i))));
     if (!allReady) return fail('還有玩家沒有準備');
+    if (this.settings.randomSeats) this.shuffleSeats();
     this.status = 'playing';
     this.dissolved = false;
     this.match = new Match(this.settings, { rng: this.deps.rng });
@@ -319,6 +320,23 @@ export class Room {
     this.thought.clear();
     this.afterChange();
     return ok;
+  }
+
+  /** 隨機座位：打亂座位順序，房主與讓分設定跟著人走 */
+  private shuffleSeats() {
+    const rng = this.deps.rng ?? ((n: number) => Math.floor(Math.random() * n));
+    const order = this.seats.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = rng(i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const handicaps: RuleSettings['handicaps'] = {};
+    order.forEach((from, to) => {
+      if (this.settings.handicaps[from]) handicaps[to] = this.settings.handicaps[from];
+    });
+    this.hostSeat = order.indexOf(this.hostSeat);
+    this.seats = order.map((from) => this.seats[from]);
+    this.settings = { ...this.settings, handicaps };
   }
 
   /** 牌局結束後加一圈 */

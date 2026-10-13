@@ -84,6 +84,10 @@ export function SettingsForm({
         換三張（配牌後可選擇把 3 張牌換給下家）
       </label>
       <label className="check">
+        <input type="checkbox" checked={value.randomSeats} onChange={(e) => up({ randomSeats: e.target.checked })} />
+        隨機座位（開始牌局時打亂座位順序）
+      </label>
+      <label className="check">
         <input type="checkbox" checked={value.allowSpectators} onChange={(e) => up({ allowSpectators: e.target.checked })} />
         允許觀戰（觀戰者只看得到公開資訊，不能參與語音）
       </label>

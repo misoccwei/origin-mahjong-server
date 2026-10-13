@@ -54,6 +54,8 @@ class Client {
   }
 
   send(msg: ClientMessage) {
+    // 測試依賴固定座位：沒有特別指定時關閉隨機座位
+    if (msg.t === 'createRoom') msg = { ...msg, settings: { randomSeats: false, ...msg.settings } };
     this.ws.send(JSON.stringify(msg));
   }
 

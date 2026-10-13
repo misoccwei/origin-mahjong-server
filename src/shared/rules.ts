@@ -45,6 +45,8 @@ export interface RuleSettings {
   smallHandLimit: boolean;
   /** 允許觀戰（觀戰者只看得到公開資訊，不能參與語音） */
   allowSpectators: boolean;
+  /** 隨機座位：開始牌局時打亂座位順序 */
+  randomSeats: boolean;
   /** 依座位的讓分設定 */
   handicaps: Record<number, SeatHandicap>;
   /** 打牌時限（秒），0 = 不限 */
@@ -69,6 +71,7 @@ export function defaultSettings(playerCount: 2 | 3 | 4 = 4): RuleSettings {
     scoring: 'additive',
     smallHandLimit: false,
     allowSpectators: true,
+    randomSeats: true,
     handicaps: {},
     turnSeconds: 20,
     claimSeconds: 15,
@@ -118,6 +121,7 @@ export function sanitizeSettings(input: Partial<RuleSettings> | undefined, prev?
     scoring: input?.scoring === 'zeroSum' || input?.scoring === 'additive' ? input.scoring : base.scoring,
     smallHandLimit: input?.smallHandLimit !== undefined ? !!input.smallHandLimit : base.smallHandLimit,
     allowSpectators: input?.allowSpectators !== undefined ? !!input.allowSpectators : base.allowSpectators,
+    randomSeats: input?.randomSeats !== undefined ? !!input.randomSeats : base.randomSeats,
     handicaps,
     turnSeconds: int(input?.turnSeconds, 0, 300, base.turnSeconds),
     claimSeconds: int(input?.claimSeconds, 0, 120, base.claimSeconds),
