@@ -351,7 +351,8 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; min-width: 220px; white-space: nowrap;
   background: var(--panel); color: var(--ink); border-radius: 12px; padding: 10px; display: grid; gap: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
-.gutter .menu-pop { right: auto; left: 0; }
+/* ⚙ 選單在右上角，往下展開 */
+.top-bar .menu-pop { top: calc(100% + 8px); bottom: auto; font-weight: 400; }
 .menu-pop .toggle { min-height: 36px; }
 .menu-pop select { font-size: 16px; }
 .menu-pop button.danger { color: var(--accent); border-color: #e7b4ad; }

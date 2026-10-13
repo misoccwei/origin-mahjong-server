@@ -295,7 +295,7 @@ function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
   );
 }
 
-/** ⚙ 選單：較少用的設定（只和最高分、電腦難度、全螢幕、離開），收起來讓工具列在手機上一排放得下 */
+/** ⚙ 選單（右上角）：較少用的設定（只和最高分、電腦難度、全螢幕、離開） */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
   const [showYaku, setShowYaku] = useState(false);
@@ -375,7 +375,7 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
 
 /**
  * 自己的手牌與操作。回傳幾個區塊，由牌桌依直式／橫式擺放：
- * top = 提示列（聽牌、打出後聽…）、hand = 手牌、tools = 工具列、boardOverlay = 疊在牌桌上的換三張選牌區。
+ * top = 提示列（聽牌、打出後聽…）、hand = 手牌、tools = 工具列、menu = ⚙ 選單（放在右上）、boardOverlay = 疊在牌桌上的換三張選牌區。
  */
 function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   room: RoomView;
@@ -491,9 +491,9 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         {t('自動摸打')}
       </button>
       <VoiceButtons />
-      <ToolsMenu room={room} game={game} setAuto={setAuto} />
     </div>
   );
+  const menu = <ToolsMenu room={room} game={game} setAuto={setAuto} />;
 
   // 換三張：候選格疊在牌桌下緣（手牌正上方），點候選格把牌放回手牌
   const boardOverlay = passing ? (
@@ -529,7 +529,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       </button>
     ) : null;
 
-  return { top, hand: handEl, tools, boardOverlay, melds: meldsEl, discardButton };
+  return { top, hand: handEl, tools, menu, boardOverlay, melds: meldsEl, discardButton };
 }
 
 /** 換三張亮牌：蓋在牌桌正中間，收到的牌翻開；沒有交換時也顯示，避免看出誰沒換 */
@@ -1057,13 +1057,14 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
-/** 局數與倒數：直式放在最上面一排，橫式放在右上角 */
-function TopBar({ game, now }: { game: GameView; now: number }) {
+/** 局數與倒數（以及 ⚙ 選單）：直式放在最上面一排，橫式放在右上角 */
+function TopBar({ game, now, menu }: { game: GameView; now: number; menu?: ReactElement }) {
   const remain = game.deadline && game.phase !== 'result' ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
   return (
     <header className="top-bar">
       {remain !== null && <span className={`top-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
       <span className="round">{t('第 {n} / {total} 局', { n: game.handNo, total: game.totalHands })}</span>
+      {menu}
     </header>
   );
 }
@@ -1220,7 +1221,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
           </div>
           {board}
           <div className="gutter right">
-            <TopBar game={game} now={now} />
+            <TopBar game={game} now={now} menu={my.menu} />
             {reco}
             {my.melds && (
               <div className="side-melds">
@@ -1237,7 +1238,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   }
   return (
     <div className={`table portrait players-${room.players.length}`}>
-      <TopBar game={game} now={now} />
+      <TopBar game={game} now={now} menu={my.menu} />
       <InfoCard room={room} game={game} tab={tab} setTab={setTab} hint={my.top} />
       <div className="stage">{board}</div>
       {my.hand}

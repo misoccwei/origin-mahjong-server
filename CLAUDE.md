@@ -104,7 +104,7 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 有 chrome-devtools MCP 時：
 1. `npm run build`，背景啟動 `PORT=3456 AI_DELAY_MS=300 npm start`（輸出導到 scratchpad）。
 2. `new_page http://localhost:3456`（可用 `isolatedContext`），`emulate` 手機尺寸，例如 `390x844x2,mobile,touch`、`844x390x2,mobile,touch,landscape`、`1280x800x1`。
-3. 用 `evaluate_script` 自動走流程：填暱稱（用原生 setter + `input` 事件）→「建立房間」→「加入 AI」×3 →「開始」→「不換」；可以開「自動摸打」快速打到結算。語言可設 `localStorage.lang = 'en'|'ja'|'zh'` 後重新整理，或用 ⚙ 選單的語言選單即時切換。
+3. 用 `evaluate_script` 自動走流程：填暱稱（用原生 setter + `input` 事件）→「建立房間」→「加入 AI」×3 →「開始」→「不換」；可以開「自動摸打」快速打到結算。語言可設 `localStorage.lang = 'en'|'ja'|'zh'` 後重新整理，或用右上角 ⚙ 選單的語言選單即時切換。
 4. 檢查超出畫面：比較元素 `getBoundingClientRect()` 與 `document.documentElement.clientWidth`。
 5. 只改前端時 `npx vite build` 後重新整理即可（伺服器不用重啟，牌局狀態會保留）；改後端要重啟伺服器（狀態會清空）。
 6. 結束時停掉伺服器（`pkill -f "tsx src/server/index.ts"`）。
@@ -119,7 +119,8 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 自摸／和按鈕上的分數與牌型 | hand.ts `winScoreView`（`AvailableActions.winScore`）、Table.tsx `winLabel` |
 | 推薦牌型（普通型／進階型切換、鳴牌時比較鳴與不鳴） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`、recommend.ts、outcome.ts |
 | AI 策略（依和牌最低分數、換三張） | ai.ts `decideAction`（`recInput`、`needsYaku`、`suggestPass`） |
-| 不鳴牌、自動摸打、自動和牌 | ai.ts `autoAction`、room.ts `setAuto`/`autoOpts`、Table.tsx `ToolsMenu` |
+| 不鳴牌、自動摸打、自動和牌 | ai.ts `autoAction`、room.ts `setAuto`/`autoOpts`、Table.tsx `useMyArea`（工具列） |
+| ⚙ 選單（右上角，與局數、倒數同一排） | Table.tsx `ToolsMenu`/`TopBar` |
 | 結算倒數、局結果、重看各局 | room.ts `schedule`/`advanceHand`/`resultView`/`replays`、Table.tsx `ResultBody`、RoomScreens.tsx `ReplayModal` |
 | 匯出結算圖片 | exportImage.ts、components/ExportButton.tsx |
 | 隨機座位 | room.ts `shuffleSeats`（房主、讓分跟著人走） |

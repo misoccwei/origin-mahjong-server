@@ -25,11 +25,12 @@ describe('牌桌畫面', () => {
     expect(html).toContain('不換');
   });
 
-  it('工具列：推薦牌型、自動和牌、自動摸打（開啟時高亮）與 ⚙ 選單', () => {
+  it('工具列：推薦牌型、自動和牌、自動摸打（開啟時高亮）；⚙ 選單在右上與局數放在一起', () => {
     const html = render(room(), game({ auto: { on: true, win: false, onlyMax: false, noCall: false } }));
     expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動摸打/);
     expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和牌/);
-    expect(html).toContain('aria-label="更多設定"');
+    expect(html).toMatch(/<header class="top-bar">.*第 1 \/ 4 局.*aria-label="更多設定".*<\/header>/);
+    expect(html.match(/<div class="my-tools">.*?<\/div>/)![0]).not.toContain('更多設定');
   });
 
   it('手牌與鳴牌是分開的區塊；沒有摸牌時保留摸牌位置（摸牌不會讓手牌移動）', () => {
