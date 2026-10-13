@@ -194,8 +194,34 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .hint-extras { display: grid; gap: 6px; margin-bottom: 6px; }
 .hint-status { font-weight: 700; font-size: 1.05em; }
 .hint-eff { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: #dfe9e3; font-size: 0.9em; }
-/* 直式：局數、倒數已在狀態列，中央面板只放剛打出的牌（放大） */
-.table.portrait .center-info .round, .table.portrait .center-info .timer { display: none; }
+/* 直式：局數、餘牌、倒數已在狀態列，中央面板只放剛打出的牌（放大）；門風與分數在中央面板四邊 */
+.table.portrait .center-info .round, .table.portrait .center-info .wall-left, .table.portrait .center-info .timer { display: none; }
+.table.portrait .plate-score { display: none; }
+/* 橫式：門風與分數放在各家名牌裡，中央面板只放局數、餘牌、倒數與剛打出的牌，餘牌與倒數放大 */
+.table.landscape .side-plate { display: none; }
+.table.landscape .nameplate { font-size: max(13px, calc(var(--S) * 0.024)); max-width: calc(var(--S) * 0.24); }
+.table.landscape .center-info {
+  inset: calc(var(--S) * 0.015); font-size: max(10px, calc(var(--S) * 0.026));
+  /* 局數、餘牌各一行；剛打出的牌與倒數並排，矮的手機橫放也放得下 */
+  grid-template-areas: 'round' 'wall' 'timer';
+  align-items: center; justify-content: center; column-gap: calc(var(--S) * 0.03); row-gap: calc(var(--S) * 0.006);
+}
+.table.landscape .center-info.has-recent { grid-template-columns: auto auto; grid-template-areas: 'round round' 'wall wall' 'recent timer'; }
+.table.landscape .center-info .round { grid-area: round; }
+.table.landscape .center-info .wall-left { grid-area: wall; }
+.table.landscape .center-info .recent { grid-area: recent; --tw: max(18px, calc(var(--S) * 0.06)); }
+.table.landscape .center-info .timer { grid-area: timer; }
+.table.landscape .center-info .recent .small { max-width: calc(var(--S) * 0.12); }
+.table.landscape .center .round { font-size: 1.1em; color: #dfe9e3; }
+.wall-left { color: #dfe9e3; font-size: 1.2em; }
+.wall-left b { font-size: 1.9em; color: #fff; font-variant-numeric: tabular-nums; line-height: 1; }
+.table.landscape .timer { font-size: 3.2em; font-variant-numeric: tabular-nums; }
+.plate-score { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.plate-score b { font-size: 1.15em; color: var(--gold); }
+.plate-score span { font-size: 1.25em; font-weight: 700; }
+.table.landscape .nameplate.active .plate-score b { color: #fff; }
+.table.landscape .nameplate.active { background: rgba(212, 160, 23, 0.55); }
+.nameplate.at-right .plate-score, .nameplate.at-top .plate-score { justify-content: flex-end; }
 .table.portrait .recent { --tw: calc(var(--S) * 0.065); }
 .table.landscape .stage { --gutter-min: clamp(150px, 22cqw, 300px); --S: min(100cqh, calc(100cqw - 2 * var(--gutter-min))); }
 .board {

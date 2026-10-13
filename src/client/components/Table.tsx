@@ -64,7 +64,7 @@ function River({ p, lastDiscard, pointKind }: { p: PlayerView; lastDiscard: Game
   );
 }
 
-/** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉 */
+/** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉（門風與分數的小牌子只在直式顯示，橫式放在名牌裡） */
 function Side({ p, game, pos, pointKind, showHand }: { p: PlayerView; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
   const active = game.currentSeat === p.seat && game.phase === 'turn';
   return (
@@ -98,6 +98,10 @@ function NamePlate({ p, room, game, pos }: { p: PlayerView; room: RoomView; game
   const active = game.currentSeat === p.seat && game.phase === 'turn';
   return (
     <div className={`nameplate at-${pos} ${active ? 'active' : ''}`}>
+      <div className="plate-score">
+        <b>{windLabel(p.wind)}</b>
+        <span>{p.score}</span>
+      </div>
       <div className="name">
         {p.nickname}
         <VoiceMark userId={p.userId} />
@@ -612,9 +616,13 @@ function Center({ room, game, now }: { room: RoomView; game: GameView; now: numb
   const recent = game.kakanTile ?? game.recentDiscard;
   return (
     <div className="center">
-      <div className="center-info">
+      <div className={`center-info ${recent ? 'has-recent' : ''}`}>
+        {/* 橫式：局數、剩幾張、倒數放大，各家的門風與分數放在名牌裡；直式這些都在上方狀態列 */}
         <div className="round">
-          第 {game.handNo} / {game.totalHands} 局・餘 {Math.max(0, game.wallRemaining - game.deadWall)}
+          第 {game.handNo} / {game.totalHands} 局
+        </div>
+        <div className="wall-left">
+          餘 <b>{Math.max(0, game.wallRemaining - game.deadWall)}</b> 張
         </div>
         {recent && (
           // 剛打出（或加槓）的牌放大顯示，鳴牌時才知道是哪一張
