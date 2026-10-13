@@ -79,4 +79,23 @@ describe('推薦牌型（牌效率）', () => {
     expect(p(2, 20, 10)).toBeLessThan(p(1, 20, 10));
     expect(p(2, 20, 10, true)).toBeGreaterThan(p(2, 20, 10, false));
   });
+
+  it('需要的牌已經用完的牌型不推薦：四張一萬都在自己的暗槓裡，萬子一氣通貫不可能', () => {
+    const hand = '🀈🀉🀊🀋🀌🀍🀎🀏🀀🀀';
+    const withKan = recommendYaku({ ...input(hand, true, [meld('🀇🀇🀇🀇', false)]) }, 20).map((x) => x.name);
+    expect(withKan).not.toContain('一氣通貫');
+    // 對照：鳴的是東，一萬還有剩，一氣通貫照樣推薦
+    const withPon = recommendYaku({ ...input('🀇🀈🀉🀊🀋🀌🀍🀎🀏🀁', true, [meld('🀀🀀🀀')]) }, 20).map((x) => x.name);
+    expect(withPon).toContain('一氣通貫');
+  });
+
+  it('看得到的牌也算進去：中已經出現 3 張就不推薦大三元', () => {
+    const hand = '🀄🀅🀅🀆🀆🀇🀈🀉🀙🀚🀛🀐🀑';
+    const visible = new Array(34).fill(0);
+    for (const k of uni(hand)) visible[k]++;
+    visible[uni('🀄')[0]] = 4; // 自己 1 張＋河裡 3 張
+    expect(recommendYaku({ ...input(hand), visible }, 20).map((x) => x.name)).not.toContain('大三元');
+    expect(recommendYaku(input(hand), 20).map((x) => x.name)).toContain('大三元');
+  });
 });
+

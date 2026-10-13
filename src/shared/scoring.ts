@@ -716,3 +716,24 @@ export function bestTenpaiScore(
   }
   return best ? { ...best, waits } : null;
 }
+
+/** 聽牌時每一張聽的牌各自的最高和牌（自摸或銃和取高者，不含偶然類）；未聽牌回傳空陣列 */
+export function scoreByWait(
+  concealed: TileKind[],
+  melds: Meld[],
+  seatWind: TileKind,
+  advanced: boolean,
+  baseScore: number,
+  expansion = false,
+): { tile: TileKind; tsumo: boolean; score: HandScore }[] {
+  const out: { tile: TileKind; tsumo: boolean; score: HandScore }[] = [];
+  for (const w of waitingKinds(concealed, melds, advanced, expansion)) {
+    let best: { tile: TileKind; tsumo: boolean; score: HandScore } | null = null;
+    for (const tsumo of [true, false]) {
+      const s = evaluateWin({ concealed: [...concealed, w], melds, winTile: w, tsumo, seatWind, advanced, baseScore, expansion });
+      if (s && (!best || s.total > best.score.total)) best = { tile: w, tsumo, score: s };
+    }
+    if (best) out.push(best);
+  }
+  return out;
+}

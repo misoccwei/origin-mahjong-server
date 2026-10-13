@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
 import type { HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
+import { OUTCOME_MAX_SHANTEN, outcomeRecommend } from '../../shared/outcome.js';
 import { baseScoreFor, type Meld } from '../../shared/rules.js';
 import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
@@ -504,6 +505,7 @@ function recommendInput(room: RoomView, game: GameView) {
     playerCount: n,
     baseScore: baseScoreFor(room.settings, me.seat),
     minWinScore: room.settings.minWinScore,
+    expansion: room.settings.expansion,
   };
 }
 
@@ -545,12 +547,26 @@ function HintExtras({ room, game }: { room: RoomView; game: GameView }) {
 
 const shantenText = (s: number) => (s < 0 ? '已成形' : s === 0 ? '聽牌' : `向聽 ${s}`);
 
+type RecoMode = 'basic' | 'outcome';
+const RECO_MODE_KEY = 'recoMode';
+
 function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameView; mode: 'beside' | 'card'; onClose: () => void }) {
-  const me = room.players[room.mySeat!];
-  const { recs, fast } = useMemo(() => {
-    const input = recommendInput(room, game);
-    return { recs: recommendYaku(input), fast: fastestWin(input) };
-  }, [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
+  // 普通型：一次看一個牌型；進階型：結果導向，以最後和牌的分數比較（記在瀏覽器）
+  const [recoMode, setRecoMode] = useState<RecoMode>(() => {
+    try {
+      return localStorage.getItem(RECO_MODE_KEY) === 'outcome' ? 'outcome' : 'basic';
+    } catch {
+      return 'basic';
+    }
+  });
+  const pick = (m: RecoMode) => {
+    setRecoMode(m);
+    try {
+      localStorage.setItem(RECO_MODE_KEY, m);
+    } catch {
+      // 無法儲存時只在這次有效
+    }
+  };
   return (
     <aside className={`reco-panel ${mode}`}>
       {mode === 'beside' && (
@@ -559,6 +575,28 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
           <button className="link" onClick={onClose} aria-label="關閉">✕</button>
         </div>
       )}
+      <div className="reco-mode" role="tablist">
+        <button role="tab" aria-selected={recoMode === 'basic'} className={recoMode === 'basic' ? 'on' : ''} onClick={() => pick('basic')}>
+          普通型
+        </button>
+        <button role="tab" aria-selected={recoMode === 'outcome'} className={recoMode === 'outcome' ? 'on' : ''} onClick={() => pick('outcome')}>
+          進階型（看和牌結果）
+        </button>
+      </div>
+      {recoMode === 'basic' ? <BasicReco room={room} game={game} /> : <OutcomeReco room={room} game={game} />}
+    </aside>
+  );
+}
+
+/** 普通型：各牌型的向聽數、有效牌、和牌率與期望值 */
+function BasicReco({ room, game }: { room: RoomView; game: GameView }) {
+  const me = room.players[room.mySeat!];
+  const { recs, fast } = useMemo(() => {
+    const input = recommendInput(room, game);
+    return { recs: recommendYaku(input), fast: fastestWin(input) };
+  }, [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
+  return (
+    <>
       <div className="reco-fast">
         <div className="reco-title">
           <span>最快和牌</span>
@@ -606,8 +644,52 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
           </section>
         );
       })}
-      <p className="small muted">依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），部分牌型為近似值，僅供參考。</p>
-    </aside>
+      <p className="small muted">依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），已經沒有剩牌的牌型不列出；部分牌型為近似值，僅供參考。</p>
+    </>
+  );
+}
+
+/** 進階型：往下模擬摸打到聽牌，依最後和牌的分數把進張方向分組 */
+function OutcomeReco({ room, game }: { room: RoomView; game: GameView }) {
+  const me = room.players[room.mySeat!];
+  const r = useMemo(() => outcomeRecommend(recommendInput(room, game)), [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
+  if (r.tooFar) {
+    return <p className="muted small">目前 {r.shanten} 向聽。進階型只計算 {OUTCOME_MAX_SHANTEN} 向聽以內（再遠變化太多），請先參考普通型。</p>;
+  }
+  if (r.shanten < 0) return <p className="muted small">已經是和牌形。</p>;
+  if (!r.plans.length) return <p className="muted small">照目前的牌，沒有能達到和牌最低分數的和法。</p>;
+  return (
+    <>
+      {r.plans.map((p, i) => (
+        <section key={p.discard ?? i} className="outcome-plan">
+          {p.discard !== undefined && (
+            <div className="reco-discard">
+              <span className="small muted">打</span>
+              <Tile kind={p.discard} small />
+              <span className="small muted">之後（{shantenText(p.shanten)}）</span>
+            </div>
+          )}
+          <ol>
+            {p.groups.slice(0, 6).map((g) => (
+              <li key={g.draws.join()}>
+                <div className="reco-title">
+                  <span className="outcome-draws">
+                    <span className="small muted">{p.shanten === 0 ? '和' : '再進'}</span>
+                    {g.draws.map((k) => (
+                      <Tile key={k} kind={k} small />
+                    ))}
+                    <span className="small muted">剩 {g.left} 張</span>
+                  </span>
+                  <span className="pts">{g.total} 分</span>
+                </div>
+                <div className="small muted">{g.yaku.join('・')}</div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      <p className="small muted">往下模擬摸打到聽牌，以最後和牌的分數（自摸或銃和取高、不含偶然類）比較；每個方向取之後都摸到好牌的最好情況，看不到剩的牌與未達和牌最低分數的和法不算。</p>
+    </>
   );
 }
 

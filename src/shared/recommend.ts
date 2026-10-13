@@ -46,6 +46,8 @@ export interface RecommendInput {
   baseScore?: number;
   /** 和牌最低分數：牌型分數＋底分未達此分數的牌型不推薦 */
   minWinScore?: number;
+  /** 牌型擴充包（結果導向計算和牌分數時用） */
+  expansion?: boolean;
 }
 
 type Evaluator = (counts: number[]) => number;
@@ -188,12 +190,23 @@ function chantaShanten(counts: number[], meldCount: number): number {
   return best;
 }
 
-/** 依手牌與鳴牌列出可以做的牌型與各自的評估函式（推薦與 AI 換三張共用） */
+/**
+ * 依手牌與鳴牌列出可以做的牌型與各自的評估函式（推薦與 AI 換三張共用）。
+ * 會參考已經出現過的牌（河裡、鳴牌、自己的槓子等）：需要的牌已經沒有剩的牌型評估為 Infinity（不可能），
+ * 例如四張一萬都在自己的槓子裡時，萬子的一氣通貫就不可能。
+ */
 export function buildTargets(input: RecommendInput): Target[] {
-  const { melds, seatWind, advanced } = input;
+  const { concealed, melds, seatWind, advanced } = input;
   const meldKinds = melds.map((m) => m.tiles.map(kindOf));
   const mc = melds.length;
   const std: Evaluator = (c) => shantenStandard(c, mc);
+  /** 還沒看到的張數（還有機會摸到或吃碰到） */
+  const visible = input.visible ?? countKinds([...concealed, ...meldKinds.flat()]);
+  const unseen = visible.map((v) => Math.max(0, 4 - v));
+  /** 手牌中這種牌最多能湊到幾張 */
+  const reach = (c: number[], k: TileKind) => Math.min(4, c[k] + unseen[k]);
+  /** 手牌（不含鳴牌）要湊的張數 */
+  const slots = 14 - 3 * mc;
   const meldsAll = (ok: (k: TileKind) => boolean) => meldKinds.every((ks) => ks.every(ok));
   // 評估會被呼叫上千次：遮罩先算好、重複使用同一個陣列，避免每次配置記憶體
   const restricted = (ok: (k: TileKind) => boolean): Evaluator | null => {
@@ -201,8 +214,13 @@ export function buildTargets(input: RecommendInput): Target[] {
     const mask = Array.from({ length: KIND_COUNT }, (_, k) => ok(k));
     const buf = new Array(KIND_COUNT).fill(0);
     return (c) => {
-      for (let k = 0; k < KIND_COUNT; k++) buf[k] = mask[k] ? c[k] : 0;
-      return shantenStandard(buf, mc);
+      // 這些牌種剩下的（手上＋還沒看到的）湊不滿手牌就不可能
+      let room = 0;
+      for (let k = 0; k < KIND_COUNT; k++) {
+        buf[k] = mask[k] ? c[k] : 0;
+        if (mask[k]) room += reach(c, k);
+      }
+      return room < slots ? Infinity : shantenStandard(buf, mc);
     };
   };
   const atLeast = (base: Evaluator, missing: (c: number[]) => number): Evaluator => (c) => Math.max(base(c), missing(c));
@@ -212,6 +230,12 @@ export function buildTargets(input: RecommendInput): Target[] {
   const all = (c: number[]) => {
     for (let k = 0; k < KIND_COUNT; k++) allBuf[k] = c[k] + meldCount[k];
     return allBuf;
+  };
+  /** 湊得到 n 張以上的牌種數 */
+  const kindsReaching = (c: number[], n: number) => {
+    let total = 0;
+    for (let k = 0; k < KIND_COUNT; k++) if (reach(c, k) >= n) total++;
+    return total;
   };
 
   const targets: Target[] = [];
@@ -226,85 +250,130 @@ export function buildTargets(input: RecommendInput): Target[] {
   // 么九類
   add('2.0', restricted((k) => !isYaochu(k)));
   if (melds.every((m) => m.type === 'chi' ? [0, 6].includes(Math.min(...m.tiles.map(kindOf)) % 9) : isYaochu(kindOf(m.tiles[0])))) {
-    add('2.1', (c) => chantaShanten(c, mc));
-  }
-  // 碰碰和
-  if (melds.every((m) => m.type !== 'chi')) {
-    add('4.1', (c) => {
-      let tri = 0;
-      let pair = 0;
-      for (let k = 0; k < KIND_COUNT; k++) {
-        if (c[k] >= 3) tri++;
-        else if (c[k] === 2) pair++;
-      }
-      const need = 4 - mc;
-      const sets = Math.min(tri, need);
-      return pair > 0 ? 8 - 2 * (sets + mc) - Math.min(pair - 1, need - sets) - 1 : 8 - 2 * (sets + mc);
+    const chantaKind = (k: TileKind) => isHonor(k) || [0, 1, 2, 6, 7, 8].includes(k % 9);
+    add('2.1', (c) => {
+      let room = 0;
+      for (let k = 0; k < KIND_COUNT; k++) if (chantaKind(k)) room += reach(c, k);
+      return room < slots ? Infinity : chantaShanten(c, mc);
     });
   }
-  // 七對子
-  if (advanced && mc === 0) add('11.1', shantenSevenPairs);
-  // 五門齊：缺幾類就至少還要幾步
+  // 碰碰和／四暗刻：還要 4 - 鳴牌組 組刻子＋雀頭，湊得到 3 張的牌種要夠
+  const triplets = (c: number[]) => {
+    const need = 4 - mc;
+    if (kindsReaching(c, 3) < need || kindsReaching(c, 2) < need + 1) return Infinity;
+    let tri = 0;
+    let pair = 0;
+    for (let k = 0; k < KIND_COUNT; k++) {
+      if (c[k] >= 3) tri++;
+      else if (c[k] === 2) pair++;
+    }
+    const sets = Math.min(tri, need);
+    return pair > 0 ? 8 - 2 * (sets + mc) - Math.min(pair - 1, need - sets) - 1 : 8 - 2 * (sets + mc);
+  };
+  if (melds.every((m) => m.type !== 'chi')) add('4.1', triplets);
+  // 七對子：四張同種可以當兩組對子
+  if (advanced && mc === 0) {
+    add('11.1', (c) => {
+      let pairs = 0;
+      for (let k = 0; k < KIND_COUNT; k++) pairs += Math.floor(reach(c, k) / 2);
+      return pairs < 7 ? Infinity : shantenSevenPairs(c);
+    });
+  }
+  // 五門齊：缺幾類就至少還要幾步；缺的那類已經沒有剩的牌就不可能
   // 五類：萬、筒、索、風、三元（位元遮罩）
   const catBit = Array.from({ length: KIND_COUNT }, (_, k) => 1 << (isWind(k) ? 3 : isDragon(k) ? 4 : suitOf(k)));
+  let reachableCats = 0;
+  for (let k = 0; k < KIND_COUNT; k++) if (unseen[k] > 0) reachableCats |= catBit[k];
   add('3.0', atLeast(std, (c) => {
     const a = all(c);
     let bits = 0;
     for (let k = 0; k < KIND_COUNT; k++) if (a[k]) bits |= catBit[k];
+    if ((bits | reachableCats) !== 0b11111) return Infinity;
     let have = 0;
     for (; bits; bits &= bits - 1) have++;
     return 5 - have;
   }));
-  // 番牌（門風、三元牌的刻子）
-  const yakuhai = [seatWind, 31, 32, 33];
+  // 番牌（門風、三元牌的刻子）：湊不到 3 張的不算
+  const yakuhai = [...new Set([seatWind, 31, 32, 33])];
   add('5.1', atLeast(std, (c) => {
     const a = all(c);
-    return Math.min(...yakuhai.map((k) => Math.max(0, 3 - a[k])));
+    let best = Infinity;
+    for (const k of yakuhai) if (a[k] + unseen[k] >= 3) best = Math.min(best, Math.max(0, 3 - a[k]));
+    return best;
   }));
-  // 三元
-  const dragonNeed = (c: number[], need: number[]) => {
+  // 三元：大三元三組刻子；小三元兩組刻子＋一組雀頭
+  const dragons = [31, 32, 33];
+  add('5.2.2', atLeast(std, (c) => {
     const a = all(c);
-    const d = [31, 32, 33].map((k) => Math.min(3, a[k])).sort((x, y) => y - x);
-    return d.reduce((a, x, i) => a + Math.max(0, need[i] - x), 0);
-  };
-  add('5.2.1', atLeast(std, (c) => dragonNeed(c, [3, 3, 2])));
-  add('5.2.2', atLeast(std, (c) => dragonNeed(c, [3, 3, 3])));
+    let total = 0;
+    for (const k of dragons) {
+      if (a[k] + unseen[k] < 3) return Infinity;
+      total += Math.max(0, 3 - a[k]);
+    }
+    return total;
+  }));
+  add('5.2.1', atLeast(std, (c) => {
+    const a = all(c);
+    let best = Infinity;
+    for (const p of dragons) {
+      let total = 0;
+      for (const k of dragons) {
+        const need = k === p ? 2 : 3;
+        if (a[k] + unseen[k] < need) total = Infinity;
+        else total += Math.max(0, need - a[k]);
+      }
+      best = Math.min(best, total);
+    }
+    return best;
+  }));
   if (advanced) {
-    const missing = (a: number[], kinds: number[]) => kinds.filter((k) => !a[k]).length;
-    const ittsuKinds = [0, 1, 2].map((s) => [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => s * 9 + i));
-    const sanshokuKinds = [0, 1, 2, 3, 4, 5, 6].map((n) => [0, 1, 2].flatMap((s) => [s * 9 + n, s * 9 + n + 1, s * 9 + n + 2]));
-    add('8.1', atLeast(std, (c) => {
-      const a = all(c);
-      return Math.min(...ittsuKinds.map((ks) => missing(a, ks)));
-    }));
-    add('9.2', atLeast(std, (c) => {
-      const a = all(c);
-      return Math.min(...sanshokuKinds.map((ks) => missing(a, ks)));
-    }));
+    // 一氣通貫／三色同順：需要固定的三組順子。吃過的順子直接算；其他順子缺的牌要還有剩，
+    // 不是這三組順子的鳴牌最多只能有一組（第四組面子）
+    const chiStarts = melds.filter((m) => m.type === 'chi').map((m) => Math.min(...m.tiles.map(kindOf)));
+    const fixedSeqs = (seqs: number[]): Evaluator | null => {
+      const used = new Set<number>();
+      const open: number[] = [];
+      for (const b of seqs) {
+        const i = chiStarts.findIndex((x, j) => x === b && !used.has(j));
+        if (i >= 0) used.add(i);
+        else open.push(b);
+      }
+      if (mc - used.size > 1) return null;
+      return (c) => {
+        let missing = 0;
+        for (const b of open) {
+          for (let k = b; k < b + 3; k++) {
+            if (c[k] > 0) continue;
+            if (unseen[k] <= 0) return Infinity;
+            missing++;
+          }
+        }
+        return missing;
+      };
+    };
+    const best = (evals: (Evaluator | null)[]): Evaluator | null => {
+      const ok = evals.filter((e): e is Evaluator => !!e);
+      return ok.length ? atLeast(std, (c) => Math.min(...ok.map((e) => e(c)))) : null;
+    };
+    add('8.1', best([0, 1, 2].map((s) => fixedSeqs([s * 9, s * 9 + 3, s * 9 + 6]))));
+    add('9.2', best([0, 1, 2, 3, 4, 5, 6].map((n) => fixedSeqs([n, 9 + n, 18 + n]))));
   }
 
   // 三暗刻：三組暗刻（暗槓也算）＋其他任意；四暗刻：只有暗刻（鳴牌只能是暗槓）
   const ankan = melds.filter((m) => m.type === 'ankan').length;
   const triNeed = (c: number[], need: number) => {
-    const top = c.map((n) => Math.min(3, n)).sort((a, b) => b - a).slice(0, Math.max(0, need - ankan));
+    const n = Math.max(0, need - ankan);
+    if (kindsReaching(c, 3) < n) return Infinity;
+    const top = c.map((x) => Math.min(3, x)).sort((a, b) => b - a).slice(0, n);
     return top.reduce((a, x) => a + 3 - x, 0);
   };
   add('4.2.3', atLeast(std, (c) => triNeed(c, 3)));
-  if (melds.every((m) => m.type === 'ankan')) {
-    add('4.2.4', (c) => {
-      let tri = 0;
-      let pair = 0;
-      for (let k = 0; k < KIND_COUNT; k++) {
-        if (c[k] >= 3) tri++;
-        else if (c[k] === 2) pair++;
-      }
-      const need = 4 - mc;
-      const sets = Math.min(tri, need);
-      return pair > 0 ? 8 - 2 * (sets + mc) - Math.min(pair - 1, need - sets) - 1 : 8 - 2 * (sets + mc);
-    });
+  if (melds.every((m) => m.type === 'ankan')) add('4.2.4', triplets);
+  // 十三么九：每種么九牌都要有，其中一種成對
+  if (advanced && mc === 0) {
+    const yaochu = Array.from({ length: KIND_COUNT }, (_, k) => k).filter(isYaochu);
+    add('11.2', (c) => (yaochu.some((k) => reach(c, k) < 1) || !yaochu.some((k) => reach(c, k) >= 2) ? Infinity : shantenThirteenOrphans(c)));
   }
-  // 十三么九
-  if (advanced && mc === 0) add('11.2', shantenThirteenOrphans);
   return targets;
 }
 
