@@ -51,6 +51,8 @@ export interface RuleSettings {
   turnSeconds: number;
   /** 鳴牌／和牌宣告時限（秒），0 = 不限 */
   claimSeconds: number;
+  /** 一局結束後結算畫面的倒數（秒），時間到自動進入下一局；0 = 等所有人按「下一局」 */
+  resultSeconds: number;
 }
 
 export const DEFAULT_ROUNDS: Record<2 | 3 | 4, number> = { 2: 2, 3: 2, 4: 1 };
@@ -70,6 +72,7 @@ export function defaultSettings(playerCount: 2 | 3 | 4 = 4): RuleSettings {
     handicaps: {},
     turnSeconds: 20,
     claimSeconds: 15,
+    resultSeconds: 20,
   };
 }
 
@@ -118,6 +121,7 @@ export function sanitizeSettings(input: Partial<RuleSettings> | undefined, prev?
     handicaps,
     turnSeconds: int(input?.turnSeconds, 0, 300, base.turnSeconds),
     claimSeconds: int(input?.claimSeconds, 0, 120, base.claimSeconds),
+    resultSeconds: int(input?.resultSeconds, 0, 300, base.resultSeconds),
   };
 }
 

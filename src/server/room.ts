@@ -31,8 +31,8 @@ export interface RoomDeps {
   onUserRemoved(userId: string): void;
   onDestroy(room: Room): void;
   aiDelayMs: number;
-  /** 一局結束後顯示結果的最長時間 */
-  resultMs: number;
+  /** 一局結束後顯示結果的最長時間；未指定時依規則設定的 resultSeconds（測試用來縮短） */
+  resultMs?: number;
   /** 換三張後亮出收到的牌多久 */
   passRevealMs: number;
   /** 等待中的房間，真人斷線多久後移出座位 */
@@ -527,11 +527,12 @@ export class Room {
       const wid = `result:${m.handIndex}`;
       if (wid !== this.windowId) {
         this.windowId = wid;
-        this.deadline = Date.now() + this.deps.resultMs;
+        const ms = this.deps.resultMs ?? this.settings.resultSeconds * 1000;
+        this.deadline = ms > 0 ? Date.now() + ms : null;
       }
       const needAck = this.seats.map((_, i) => i).filter((i) => !this.isAISeat(i));
       if (needAck.every((i) => this.acks.has(i))) this.later(0, () => this.advanceHand());
-      else this.later(this.deadline! - Date.now(), () => this.advanceHand());
+      else if (this.deadline !== null) this.later(this.deadline - Date.now(), () => this.advanceHand());
       return;
     }
     if (hand.phase === 'passReveal') {

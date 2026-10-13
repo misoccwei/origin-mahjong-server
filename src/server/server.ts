@@ -18,6 +18,7 @@ export interface ServerOptions {
   aiDelayMs?: number;
   /** 語音用的 ICE servers（STUN／TURN），預設為公用 STUN */
   iceServers?: { urls: string | string[]; username?: string; credential?: string }[];
+  /** 結算畫面的倒數；未指定時依房間設定（resultSeconds） */
   resultMs?: number;
   /** 換三張後亮出收到的牌多久 */
   passRevealMs?: number;
@@ -93,7 +94,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       log(`room ${room.id} closed`);
     },
     aiDelayMs: opts.aiDelayMs ?? 700,
-    resultMs: opts.resultMs ?? 30_000,
+    resultMs: opts.resultMs,
     passRevealMs: opts.passRevealMs ?? 3000,
     waitingOfflineMs: opts.waitingOfflineMs ?? 60_000,
     rng: opts.rng,

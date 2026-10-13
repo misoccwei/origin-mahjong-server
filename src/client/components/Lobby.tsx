@@ -106,6 +106,11 @@ export function SettingsForm({
         <NumInput min={0} max={120} value={value.claimSeconds} onChange={(v) => up({ claimSeconds: v ?? 0 })} />
         <span className="muted small">秒</span>
       </label>
+      <label>
+        結算倒數
+        <NumInput min={0} max={300} value={value.resultSeconds} onChange={(v) => up({ resultSeconds: v ?? 0 })} />
+        <span className="muted small">秒（時間到自動進入下一局，0 = 等所有人按）</span>
+      </label>
       {seatNames && (
         <details>
           <summary>讓分設定（每人基本底分）</summary>
