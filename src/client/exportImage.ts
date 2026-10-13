@@ -1,4 +1,4 @@
-import type { GameView, HandResultView, RoomView } from '../shared/protocol.js';
+import type { HandResultView, RoomView } from '../shared/protocol.js';
 import type { Meld } from '../shared/rules.js';
 import type { HandScore } from '../shared/scoring.js';
 import { WHITE, kindOf, tileName, type TileId, type TileKind } from '../shared/tiles.js';
@@ -186,9 +186,11 @@ function header(p: Painter, room: RoomView, subtitle: string, title: string) {
   p.y += 44;
 }
 
-/** 一局的結果 */
-export async function renderHandResult(room: RoomView, game: GameView): Promise<HTMLCanvasElement> {
-  const r = game.result as HandResultView;
+/** 一局的結果；totals 為這一局結束後的累計分數 */
+export async function renderHandResult(
+  room: RoomView,
+  { handNo, totalHands, result: r, totals }: { handNo: number; totalHands: number; result: HandResultView; totals: number[] },
+): Promise<HTMLCanvasElement> {
   const names = room.players.map((p) => p.nickname ?? '-');
   const p = new Painter(3000);
   const kinds = [...r.hands.flat(), ...r.melds.flat().flatMap((m) => m.tiles)].filter((t) => t >= 0).map(kindOf);
@@ -196,7 +198,7 @@ export async function renderHandResult(room: RoomView, game: GameView): Promise<
   await p.preload(kinds);
 
   const title = r.kind === 'draw' ? '流局' : r.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : '和牌'}`).join('、');
-  header(p, room, `第 ${game.handNo} / ${game.totalHands} 局`, title);
+  header(p, room, `第 ${handNo} / ${totalHands} 局`, title);
 
   const winnerOf = (s: number) => r.winners.find((w) => w.seat === s);
   const tenpaiOf = (s: number) => (winnerOf(s) ? undefined : r.tenpai.find((t) => t.seat === s));
@@ -256,7 +258,7 @@ export async function renderHandResult(room: RoomView, game: GameView): Promise<
     const d = r.deltas[pl.seat];
     p.text(names[pl.seat], left, p.y + rowH / 2, { size: 15, weight: 600 });
     p.text(signed(d), right - 120, p.y + rowH / 2, { size: 15, weight: 700, color: deltaColor(d), align: 'right' });
-    p.text(String(pl.score + d), right, p.y + rowH / 2, { size: 15, weight: 700, align: 'right' });
+    p.text(String(totals[pl.seat]), right, p.y + rowH / 2, { size: 15, weight: 700, align: 'right' });
     p.y += rowH;
   }
   p.y += 6;

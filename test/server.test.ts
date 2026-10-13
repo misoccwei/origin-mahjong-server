@@ -367,12 +367,25 @@ describe('對局', () => {
     const scores = host.room!.players.map((p) => p.score);
     const sum = host.room!.history.reduce((a, h) => a.map((x, i) => x + h.deltas[i]), [0, 0, 0, 0]);
     expect(scores).toEqual(sum);
+    // 結束後可以重看每一局：自己的手牌看得到；沒和牌、沒聽牌、沒展示的他人手牌不公開
+    const replays = host.room!.replays;
+    expect(replays.map((x) => x.handNo)).toEqual([1, 2, 3, 4]);
+    for (const { result: r } of replays) {
+      expect(r.hands[0].length).toBeGreaterThan(0);
+      for (let s = 1; s < 4; s++) {
+        const visible = r.winners.some((w) => w.seat === s) || r.tenpai.some((t) => t.seat === s) || r.shown.includes(s);
+        if (!visible) expect(r.hands[s]).toEqual([]);
+      }
+    }
     // 加一圈
     b.send({ t: 'extend' });
     await b.waitFor(() => b.errors.some((e) => e.includes('房主')));
     host.send({ t: 'extend' });
     await host.waitFor(() => host.room?.status === 'playing');
+    expect(host.room!.replays).toEqual([]);
     await host.waitFor(() => host.room?.status === 'finished' && host.room.history.length === 8, 60000);
+    // 加圈前的局也還看得到
+    expect(host.room!.replays.map((x) => x.handNo)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('真人斷線時暫停，由房主決定 AI 代打；重連後拿回控制權', async () => {

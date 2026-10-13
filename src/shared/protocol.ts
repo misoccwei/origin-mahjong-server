@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/protocol.test.ts 會在本檔變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 // ---- 遊戲行動 ----
 
@@ -102,6 +102,12 @@ export interface HandHistoryEntry {
   deltas: number[];
 }
 
+/** 牌局結束後重看某一局的結果 */
+export interface HandReplayView {
+  handNo: number;
+  result: HandResultView;
+}
+
 export interface GameView {
   handNo: number; // 1-based
   totalHands: number;
@@ -155,6 +161,8 @@ export interface RoomView {
   dissolved: boolean;
   /** 觀戰者（不佔座位） */
   spectators: { userId: string; nickname: string }[];
+  /** 牌局結束後才有：每一局的結果（加圈的話也包含之前的局），手牌一樣只公開看得到的 */
+  replays: HandReplayView[];
 }
 
 /** 大廳的房間列表：等待中有空位（可加入），或允許觀戰的房間 */

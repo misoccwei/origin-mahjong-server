@@ -44,6 +44,7 @@ function room(patch: Partial<RoomView> = {}): RoomView {
     history: [],
     dissolved: false,
     spectators: [],
+    replays: [],
     ...patch,
   };
 }

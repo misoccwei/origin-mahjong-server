@@ -1,7 +1,7 @@
-import type { GameAction, GameView, PlayerView, RoomSummary, RoomView } from '../shared/protocol.js';
+import type { GameAction, GameView, HandResultView, PlayerView, RoomSummary, RoomView } from '../shared/protocol.js';
 import { sanitizeSettings, type AILevel, type Meld, type RuleSettings } from '../shared/rules.js';
 import { autoAction, decideAction } from './engine/ai.js';
-import type { Rng } from './engine/hand.js';
+import type { HandResult, Rng } from './engine/hand.js';
 import { Match } from './engine/match.js';
 
 export interface Seat {
@@ -65,6 +65,8 @@ export class Room {
   private windowId = '';
   private deadline: number | null = null;
   private aiCounter = 0;
+  /** 這場牌局每一局的結果與當時主動展示手牌的座位（加圈時保留，重新開始時清空） */
+  private replays: { handNo: number; result: HandResult; shown: number[] }[] = [];
   /** 觀戰者：userId → 暱稱與斷線時間 */
   spectators = new Map<string, { nickname: string; offlineSince: number | null }>();
 
@@ -314,6 +316,7 @@ export class Room {
     if (this.settings.randomSeats) this.shuffleSeats();
     this.status = 'playing';
     this.dissolved = false;
+    this.replays = [];
     this.match = new Match(this.settings, { rng: this.deps.rng });
     this.match.startHand();
     this.acks.clear();
@@ -358,6 +361,7 @@ export class Room {
     if (this.status !== 'finished') return fail('牌局尚未結束');
     this.status = 'waiting';
     this.match = null;
+    this.replays = [];
     this.dissolved = false;
     this.seats = this.seats.map((s) => (s && !s.left ? { ...s, ready: s.isAI, aiControlled: false, autoPlay: false } : null));
     this.afterChange();
@@ -472,6 +476,7 @@ export class Room {
   private advanceHand() {
     const m = this.match;
     if (!m?.hand || m.hand.phase !== 'ended') return;
+    this.replays.push({ handNo: m.handIndex + 1, result: m.hand.result!, shown: [...this.shown] });
     m.completeHand();
     this.acks.clear();
     this.shown.clear();
@@ -670,6 +675,23 @@ export class Room {
       history: this.match?.history ?? [],
       dissolved: this.dissolved,
       spectators: [...this.spectators].map(([id, s]) => ({ userId: id, nickname: s.nickname })),
+      replays: this.status === 'finished' ? this.replays.map((x) => ({ handNo: x.handNo, result: this.resultView(x.result, x.shown, mySeat, []) })) : [],
+    };
+  }
+
+  /** 局結果：只公開看得到的手牌（自己、和牌者、聽牌者、主動展示者），連同暗槓一起；其他座位遮蔽 */
+  private resultView(r: HandResult, shown: number[], seat: number, acknowledged: number[]): HandResultView {
+    const revealed = (i: number) => i === seat || shown.includes(i) || r.winners.some((w) => w.seat === i) || r.tenpai.some((t) => t.seat === i);
+    return {
+      kind: r.kind,
+      winners: r.winners,
+      tenpai: r.tenpai,
+      deltas: r.deltas,
+      lines: r.lines,
+      hands: r.hands.map((h, i) => (revealed(i) ? h : [])),
+      melds: r.melds.map((ms, i) => (revealed(i) ? ms : maskAnkan(ms))),
+      shown,
+      acknowledged,
     };
   }
 
@@ -683,8 +705,6 @@ export class Room {
     const mine = seat >= 0;
     const phase = hand.phase === 'ended' ? 'result' : hand.phase;
     const r = hand.result;
-    // 局結果中看得到手牌的座位（自己、和牌者、聽牌者、主動展示者）：連同暗槓一起公開
-    const revealed = (i: number) => i === seat || this.shown.has(i) || !!r?.winners.some((w) => w.seat === i) || !!r?.tenpai.some((t) => t.seat === i);
     return {
       handNo: m.handIndex + 1,
       totalHands: m.totalHands,
@@ -713,19 +733,7 @@ export class Room {
       thinkAvailable:
         mine &&
         !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,
-      result: r
-        ? {
-            kind: r.kind,
-            winners: r.winners,
-            tenpai: r.tenpai,
-            deltas: r.deltas,
-            lines: r.lines,
-            hands: r.hands.map((h, i) => (revealed(i) ? h : [])),
-            melds: r.melds.map((ms, i) => (revealed(i) ? ms : maskAnkan(ms))),
-            shown: [...this.shown],
-            acknowledged: [...this.acks],
-          }
-        : null,
+      result: r ? this.resultView(r, [...this.shown], seat, [...this.acks]) : null,
       smallHandAvailable: m.smallHandAvailable(),
     };
   }

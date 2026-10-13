@@ -6,7 +6,8 @@ import { AI_LEVEL_LABEL, AILevelSelect } from './Inputs.js';
 import { SettingsForm } from './Lobby.js';
 import { VoicePanel } from './Voice.js';
 import { ExportButton } from './ExportButton.js';
-import { renderFinal } from '../exportImage.js';
+import { renderFinal, renderHandResult } from '../exportImage.js';
+import { ResultBody } from './Table.js';
 
 function rulesSummary(s: RuleSettings) {
   return [
@@ -162,7 +163,47 @@ export function FinalScreen({ room }: { room: RoomView }) {
       </div>
       <div className="panel">
         <h2>各局紀錄</h2>
+        {room.replays.length > 0 && <p className="muted small">點一局可以重看那一局的結果。</p>}
         <HistoryTable room={room} />
+      </div>
+    </div>
+  );
+}
+
+/** 牌局結束後重看某一局：可以切換上一局／下一局、匯出圖片 */
+function ReplayModal({ room, handNo, setHandNo }: { room: RoomView; handNo: number; setHandNo: (n: number | null) => void }) {
+  const idx = room.replays.findIndex((x) => x.handNo === handNo);
+  const replay = room.replays[idx];
+  if (!replay) return null;
+  // 這一局結束後的累計分數
+  const totals = room.players.map((p) =>
+    room.history.filter((h) => h.handNo <= handNo).reduce((a, h) => a + h.deltas[p.seat], 0),
+  );
+  const total = room.history.length;
+  const prev = room.replays[idx - 1];
+  const next = room.replays[idx + 1];
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setHandNo(null)}>
+      <div className="modal result">
+        <div className="reco-head">
+          <strong>
+            第 {handNo} / {total} 局
+          </strong>
+          <button className="link" onClick={() => setHandNo(null)} aria-label="關閉">✕</button>
+        </div>
+        <ResultBody room={room} r={replay.result} totals={totals} live={false} />
+        <div className="result-actions">
+          <button disabled={!prev} onClick={() => prev && setHandNo(prev.handNo)}>
+            上一局
+          </button>
+          <button disabled={!next} onClick={() => next && setHandNo(next.handNo)}>
+            下一局
+          </button>
+          <ExportButton
+            render={() => renderHandResult(room, { handNo, totalHands: total, result: replay.result, totals })}
+            filename={`原點麻將-${room.id}-第${handNo}局.png`}
+          />
+        </div>
       </div>
     </div>
   );
@@ -170,8 +211,11 @@ export function FinalScreen({ room }: { room: RoomView }) {
 
 export function HistoryTable({ room }: { room: RoomView }) {
   const names = room.players.map((p) => p.nickname ?? '-');
+  const [viewing, setViewing] = useState<number | null>(null);
+  const canReplay = (handNo: number) => room.replays.some((x) => x.handNo === handNo);
   return (
     <div className="table-scroll">
+      {viewing !== null && <ReplayModal room={room} handNo={viewing} setHandNo={setViewing} />}
       <table className="history">
         <thead>
           <tr>
@@ -184,7 +228,12 @@ export function HistoryTable({ room }: { room: RoomView }) {
         </thead>
         <tbody>
           {room.history.map((h) => (
-            <tr key={h.handNo}>
+            <tr
+              key={h.handNo}
+              className={canReplay(h.handNo) ? 'replayable' : ''}
+              onClick={canReplay(h.handNo) ? () => setViewing(h.handNo) : undefined}
+              title={canReplay(h.handNo) ? '重看這一局' : undefined}
+            >
               <td>{h.handNo}</td>
               <td className="left">
                 {h.kind === 'draw'

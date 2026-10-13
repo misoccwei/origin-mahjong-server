@@ -673,14 +673,11 @@ function Delta({ d }: { d: number }) {
   return <span className={`delta ${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}`}>{d > 0 ? `+${d}` : d}</span>;
 }
 
-/** 一局的結果：每位玩家一張卡片（和牌 → 聽牌 → 其他），最後是分數表 */
-function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
-  const r = game.result as HandResultView;
+/** 一局結果的卡片（和牌 → 聽牌 → 其他）與分數表；totals = 這一局結束後的累計分數。牌局中與結束後重看共用 */
+export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandResultView; totals: number[]; live: boolean }) {
   const names = room.players.map((p) => p.nickname);
   const me = room.mySeat;
-  const acked = me !== null && r.acknowledged.includes(me);
   const shown = r.shown ?? [];
-  const remain = game.deadline ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
   const winnerOf = (s: number) => r.winners.find((w) => w.seat === s);
   const tenpaiOf = (s: number) => (winnerOf(s) ? undefined : r.tenpai.find((t) => t.seat === s));
   const order = [...room.players.map((p) => p.seat)].sort((a, b) => {
@@ -688,83 +685,98 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
     return rank(a) - rank(b) || a - b;
   });
   return (
-    <div className="modal-backdrop">
-      <div className="modal result">
-        <h2>{r.kind === 'draw' ? '流局' : r.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : '和牌'}`).join('、')}</h2>
-        {order.map((s) => {
-          const w = winnerOf(s);
-          const t = tenpaiOf(s);
-          const d = r.deltas[s];
-          if (w) {
-            return (
-              <section key={s} className="result-card win">
-                <header>
-                  <span className="name">{names[s]}</span>
-                  <span className="tag win">{w.tsumo ? '自摸' : `銃和・放銃 ${names[w.from!]}`}</span>
-                  <Delta d={d} />
-                </header>
-                <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} extra={{ tile: w.tile }} />
-                <YakuChips score={w.score} totalLabel="和牌分數" />
-              </section>
-            );
-          }
-          if (t) {
-            const capped = d < t.maxScore && d > 0;
-            return (
-              <section key={s} className="result-card tenpai">
-                <header>
-                  <span className="name">{names[s]}</span>
-                  <span className="tag tenpai">聽牌</span>
-                  <Delta d={d} />
-                </header>
-                <div className="waits-line small">
-                  聽
-                  {t.waits.map((k) => (
-                    <Tile key={k} kind={k} small highlight={k === t.best.tile} />
-                  ))}
-                </div>
-                <div className="small muted">
-                  最高分的和法：{t.best.tsumo ? '自摸' : '銃和'}「{kindLabel(t.best.tile)}」（聽牌得分依此計算）
-                </div>
-                <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: t.best.tile }} />
-                <YakuChips score={t.best.score} totalLabel="最高和牌分數" />
-                {capped && <div className="small muted">聽牌得分不超過和牌者的得分，實得 {d} 分</div>}
-              </section>
-            );
-          }
-          const visible = shown.includes(s);
+    <>
+      <h2>{r.kind === 'draw' ? '流局' : r.winners.map((w) => `${names[w.seat]} ${w.tsumo ? '自摸' : '和牌'}`).join('、')}</h2>
+      {order.map((s) => {
+        const w = winnerOf(s);
+        const t = tenpaiOf(s);
+        const d = r.deltas[s];
+        if (w) {
           return (
-            <section key={s} className="result-card other">
+            <section key={s} className="result-card win">
               <header>
                 <span className="name">{names[s]}</span>
-                <span className="tag">{visible ? '展示手牌' : '未聽牌'}</span>
+                <span className="tag win">{w.tsumo ? '自摸' : `銃和・放銃 ${names[w.from!]}`}</span>
                 <Delta d={d} />
               </header>
-              {visible ? (
-                <HandRow hand={r.hands[s]} melds={r.melds[s]} />
-              ) : s === me ? (
-                <button className="show-hand" onClick={() => send({ t: 'showHand' })}>展示我的手牌</button>
-              ) : (
-                <div className="small muted">手牌未公開</div>
-              )}
+              <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} extra={{ tile: w.tile }} />
+              <YakuChips score={w.score} totalLabel="和牌分數" />
             </section>
           );
-        })}
-        <table className="deltas">
-          <tbody>
-            {room.players.map((p) => (
-              <tr key={p.seat}>
-                <td>{p.nickname}</td>
-                <td className={r.deltas[p.seat] > 0 ? 'pos' : r.deltas[p.seat] < 0 ? 'neg' : ''}>
-                  {r.deltas[p.seat] > 0 ? '+' : ''}
-                  {r.deltas[p.seat]}
-                </td>
-                <td>{p.score + r.deltas[p.seat]}</td>
-                <td className="muted small">{r.acknowledged.includes(p.seat) || p.isAI || p.aiControlled ? '✓' : ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        }
+        if (t) {
+          const capped = d < t.maxScore && d > 0;
+          return (
+            <section key={s} className="result-card tenpai">
+              <header>
+                <span className="name">{names[s]}</span>
+                <span className="tag tenpai">聽牌</span>
+                <Delta d={d} />
+              </header>
+              <div className="waits-line small">
+                聽
+                {t.waits.map((k) => (
+                  <Tile key={k} kind={k} small highlight={k === t.best.tile} />
+                ))}
+              </div>
+              <div className="small muted">
+                最高分的和法：{t.best.tsumo ? '自摸' : '銃和'}「{kindLabel(t.best.tile)}」（聽牌得分依此計算）
+              </div>
+              <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: t.best.tile }} />
+              <YakuChips score={t.best.score} totalLabel="最高和牌分數" />
+              {capped && <div className="small muted">聽牌得分不超過和牌者的得分，實得 {d} 分</div>}
+            </section>
+          );
+        }
+        // 重看時自己的手牌一律顯示（伺服器本來就會送自己的）
+        const visible = shown.includes(s) || (!live && r.hands[s].length > 0);
+        return (
+          <section key={s} className="result-card other">
+            <header>
+              <span className="name">{names[s]}</span>
+              <span className="tag">{shown.includes(s) ? '展示手牌' : '未聽牌'}</span>
+              <Delta d={d} />
+            </header>
+            {visible ? (
+              <HandRow hand={r.hands[s]} melds={r.melds[s]} />
+            ) : s === me && live ? (
+              <button className="show-hand" onClick={() => send({ t: 'showHand' })}>展示我的手牌</button>
+            ) : (
+              <div className="small muted">手牌未公開</div>
+            )}
+          </section>
+        );
+      })}
+      <table className="deltas">
+        <tbody>
+          {room.players.map((p) => (
+            <tr key={p.seat}>
+              <td>{p.nickname}</td>
+              <td className={r.deltas[p.seat] > 0 ? 'pos' : r.deltas[p.seat] < 0 ? 'neg' : ''}>
+                {r.deltas[p.seat] > 0 ? '+' : ''}
+                {r.deltas[p.seat]}
+              </td>
+              <td>{totals[p.seat]}</td>
+              {live && <td className="muted small">{r.acknowledged.includes(p.seat) || p.isAI || p.aiControlled ? '✓' : ''}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+/** 一局的結果（牌局中） */
+function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
+  const r = game.result as HandResultView;
+  const me = room.mySeat;
+  const acked = me !== null && r.acknowledged.includes(me);
+  const remain = game.deadline ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  const totals = room.players.map((p) => p.score + r.deltas[p.seat]);
+  return (
+    <div className="modal-backdrop">
+      <div className="modal result">
+        <ResultBody room={room} r={r} totals={totals} live />
         <div className="result-actions">
           {me === null ? (
             <p className="muted small">觀戰中：等待玩家進入下一局{remain !== null ? `（${remain}）` : ''}</p>
@@ -774,7 +786,10 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
               {remain !== null ? `（${remain}）` : ''}
             </button>
           )}
-          <ExportButton render={() => renderHandResult(room, game)} filename={`原點麻將-${room.id}-第${game.handNo}局.png`} />
+          <ExportButton
+            render={() => renderHandResult(room, { handNo: game.handNo, totalHands: game.totalHands, result: r, totals })}
+            filename={`原點麻將-${room.id}-第${game.handNo}局.png`}
+          />
         </div>
       </div>
     </div>
