@@ -114,14 +114,15 @@ function NamePlate({ p, room, game, pos }: { p: PlayerView; room: RoomView; game
 }
 
 /**
- * 吃碰槓和、自摸、暗槓／加槓：大按鈕疊在牌桌下緣、手牌正上方。
+ * 打出、吃碰槓和、自摸、暗槓／加槓：大按鈕疊在牌桌下緣、手牌正上方。
  * 不放正中間：中間顯示著剛打出的牌，碰／吃時需要看得到是哪一張。
  */
-function CallOverlay({ game }: { game: GameView }) {
+function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: ReactElement | null }) {
   const p = game.pending;
   if (!p || p.kind === 'passThree') return null;
   const buttons: ReactElement[] = [];
   if (p.kind === 'turn') {
+    if (discardButton) buttons.push(discardButton);
     if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>自摸</button>);
     for (const k of p.ankan ?? []) buttons.push(<button key={'an' + k} className="call kan" onClick={() => act({ type: 'ankan', kind: k })}>暗槓 <Tile kind={k} small /></button>);
     for (const k of p.kakan ?? []) buttons.push(<button key={'ka' + k} className="call kan" onClick={() => act({ type: 'kakan', kind: k })}>加槓 <Tile kind={k} small /></button>);
@@ -306,11 +307,6 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       onMouseLeave={() => setHover(null)}
     >
       <Tile tile={t} selected={!passing && selected.includes(t)} highlight={!!hints[kindOf(t)] && p?.kind === 'turn'} />
-      {p?.kind === 'turn' && selected.length === 1 && selected[0] === t && (
-        <button className="discard-btn" onClick={(e) => (e.stopPropagation(), act({ type: 'discard', tile: t }), setSelected([]))}>
-          打出
-        </button>
-      )}
     </span>
   );
 
@@ -410,7 +406,16 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
     </div>
   ) : null;
 
-  return { top, hand: handEl, tools, boardOverlay, melds: meldsEl };
+  // 「打出」固定在牌桌下緣的操作區（和自摸、暗槓同一排），不跟著選中的牌移動
+  const toDiscard = p?.kind === 'turn' && selected.length === 1 && game.myHand.includes(selected[0]) ? selected[0] : null;
+  const discardButton =
+    toDiscard !== null ? (
+      <button key="discard" className="call discard" onClick={() => (act({ type: 'discard', tile: toDiscard }), setSelected([]))}>
+        打出 <Tile tile={toDiscard} small />
+      </button>
+    ) : null;
+
+  return { top, hand: handEl, tools, boardOverlay, melds: meldsEl, discardButton };
 }
 
 /** 換三張亮牌：蓋在牌桌正中間，收到的牌翻開；沒有交換時也顯示，避免看出誰沒換 */
@@ -874,12 +879,14 @@ function useLandscape() {
   return !!landscape;
 }
 
-function Board({ room, game, now, pointKind, overlay, swapMini = true, view = 0 }: {
+function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = true, view = 0 }: {
   room: RoomView;
   game: GameView;
   now: number;
   pointKind: TileKind | null;
   overlay: ReactElement | null;
+  /** 選了手牌後的「打出」按鈕 */
+  discardButton?: ReactElement | null;
   /** 觀戰視角：坐在下方的座位 */
   view?: number;
   /** 直式時換三張紀錄改放在上方資訊卡，牌桌上不顯示 */
@@ -892,7 +899,7 @@ function Board({ room, game, now, pointKind, overlay, swapMini = true, view = 0 
   return (
     <div className="board">
       <Center room={room} game={game} now={now} />
-      <CallOverlay game={game} />
+      <CallOverlay game={game} discardButton={discardButton} />
       {overlay}
       {spectating ? null : game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
       {room.players.map((p) => {
@@ -942,7 +949,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   const recoOn = landscape ? showReco : tab === 'reco';
   const toggleReco = () => (landscape ? setShowReco((v) => !v) : setTab((t) => (t === 'reco' ? 'hint' : 'reco')));
   const my = useMyArea({ room, game, onPoint: setPointKind, showReco: recoOn, toggleReco, landscape });
-  const board = <Board room={room} game={game} now={now} pointKind={pointKind} overlay={my.boardOverlay} swapMini={landscape} />;
+  const board = <Board room={room} game={game} now={now} pointKind={pointKind} overlay={my.boardOverlay} discardButton={my.discardButton} swapMini={landscape} />;
   const reco = landscape && showReco && <RecoPanel room={room} game={game} mode="beside" onClose={() => setShowReco(() => false)} />;
   const modals = (
     <>

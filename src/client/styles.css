@@ -306,12 +306,6 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .pass-actions { display: flex; flex-direction: column; gap: 6px; }
 .pass-actions .call { min-height: max(40px, calc(var(--S) * 0.065)); min-width: max(64px, calc(var(--S) * 0.12)); font-size: max(16px, calc(var(--S) * 0.03)); }
 .pass-actions .call:disabled { opacity: 0.45; }
-.discard-btn {
-  position: absolute; left: 50%; bottom: calc(100% + var(--tw) * 0.4); transform: translateX(-50%); z-index: 3;
-  padding: 6px 14px; font-size: 1em; font-weight: 700; white-space: nowrap;
-  background: var(--gold); color: #fff; border: none; border-radius: 999px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-.discard-btn:hover:not(:disabled) { background: #b8890f; }
 
 /* 吃碰槓和：大按鈕疊在牌桌下緣（手牌正上方），不蓋到中央剛打出的牌 */
 .call-overlay {
@@ -328,6 +322,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 }
 .call.win, .call.win:hover:not(:disabled) { background: linear-gradient(180deg, #e74c3c, #a93226); }
 .call.win { animation: pulse 1s ease-in-out infinite; }
+.call.discard, .call.discard:hover:not(:disabled) { background: linear-gradient(180deg, #e0b23a, #b8890f); }
 .call.pon, .call.pon:hover:not(:disabled) { background: linear-gradient(180deg, #2f80ed, #1c5bb8); }
 .call.kan, .call.kan:hover:not(:disabled) { background: linear-gradient(180deg, #8e44ad, #6c3483); }
 .call.chi, .call.chi:hover:not(:disabled) { background: linear-gradient(180deg, #27ae60, #1e8449); }
@@ -438,7 +433,6 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 
 @media (max-width: 760px) {
   #root { padding: 8px; }
-  .discard-btn { padding: 10px 18px; font-size: 1.1em; }
   /* 結算：手機上牌小一點，一副手牌盡量一排放得下 */
   .modal { padding: 14px; }
   .modal .tile.small { --tw: min(21px, calc((100vw - 96px) / 15.5)); }
