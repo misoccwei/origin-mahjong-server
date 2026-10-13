@@ -252,8 +252,6 @@ export const en: Record<string, string> = {
   '等待 {name} 決定（玩家回來後會自動繼續）…': 'Waiting for {name} to decide (resumes when the player returns)…',
   '玩家': 'a player',
   '確定要離開牌局嗎？': 'Leave the game?',
-  '第 {n} / {total} 局・餘 {left}': 'Hand {n}/{total} · {left} left',
-  '我': 'Me',
   '提示': 'Tips',
   '準備下一局…': 'Preparing the next hand…',
   '鳴牌': 'Melds',

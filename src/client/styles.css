@@ -154,23 +154,16 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   /* 牌桌（正方形）邊長；自訂屬性在使用處才計算，所以 cq 單位以 .stage 為準 */
   --S: min(100cqw, 100cqh);
 }
-/* 直式：上方狀態列 → 資訊卡（吃掉多出來的高度）→ 正方形牌桌 → 手牌 → 工具列。
+/* 直式：上方一排（倒數、局數）→ 資訊卡（吃掉多出來的高度）→ 正方形牌桌 → 手牌 → 工具列。
    牌桌先依寬度決定大小，矮的螢幕上牌桌才會縮小，資訊卡最少保留一行 */
 .table.portrait .stage { flex: 0 1 calc(100vw - 16px); min-height: 220px; }
-.status-bar { flex: none; display: grid; gap: 4px; }
-.status-row { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 0.95em; }
-.status-timer { color: var(--gold); font-variant-numeric: tabular-nums; }
-.status-timer.urgent { color: #ff6b5b; }
-.score-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; }
-.score-chip {
-  display: flex; align-items: center; gap: 4px; min-width: 0; padding: 4px 6px; border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3); font-size: 0.85em; border: 1.5px solid transparent;
-}
-.score-chip b { flex: none; }
-.score-chip .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.score-chip .pt { font-variant-numeric: tabular-nums; font-weight: 700; }
-.score-chip.me { border-color: rgba(255, 255, 255, 0.35); }
-.score-chip.active { background: var(--gold); color: #fff; }
+/* 局數與倒數：直式在最上面（倒數靠左放大），橫式在右側欄最上面靠右 */
+.top-bar { flex: none; display: flex; align-items: center; gap: 12px; min-height: 40px; font-weight: 700; }
+.top-bar .round { margin-left: auto; color: #dfe9e3; white-space: nowrap; }
+.top-timer { color: var(--gold); font-size: 1.9em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.top-timer.urgent { color: #ff6b5b; }
+.gutter .top-bar { justify-content: flex-end; }
+.gutter .top-bar .round { order: -1; }
 .info-card {
   flex: 1 1 0; min-height: 76px; display: flex; flex-direction: column; overflow: hidden;
   background: rgba(0, 0, 0, 0.22); border-radius: 12px;
@@ -194,35 +187,16 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .hint-extras { display: grid; gap: 6px; margin-bottom: 6px; }
 .hint-status { font-weight: 700; font-size: 1.05em; }
 .hint-eff { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: #dfe9e3; font-size: 0.9em; }
-/* 直式：局數、餘牌、倒數已在狀態列，中央面板只放剛打出的牌（放大）；門風與分數在中央面板四邊 */
-.table.portrait .center-info .round, .table.portrait .center-info .wall-left, .table.portrait .center-info .timer { display: none; }
-.table.portrait .plate-score { display: none; }
-/* 橫式：門風與分數放在各家名牌裡，中央面板只放局數、餘牌、倒數與剛打出的牌，餘牌與倒數放大 */
-.table.landscape .side-plate { display: none; }
-.table.landscape .nameplate { font-size: max(13px, calc(var(--S) * 0.024)); max-width: calc(var(--S) * 0.24); }
-.table.landscape .center-info {
-  inset: calc(var(--S) * 0.015); font-size: max(10px, calc(var(--S) * 0.026));
-  /* 局數、餘牌各一行；剛打出的牌與倒數並排，矮的手機橫放也放得下 */
-  grid-template-areas: 'round' 'wall' 'timer';
-  align-items: center; justify-content: center; column-gap: calc(var(--S) * 0.03); row-gap: calc(var(--S) * 0.006);
-}
-.table.landscape .center-info.has-recent { grid-template-columns: auto auto; grid-template-areas: 'round round' 'wall wall' 'recent timer'; }
-.table.landscape .center-info .round { grid-area: round; }
-.table.landscape .center-info .wall-left { grid-area: wall; }
-.table.landscape .center-info .recent { grid-area: recent; --tw: max(18px, calc(var(--S) * 0.06)); }
-.table.landscape .center-info .timer { grid-area: timer; }
-.table.landscape .center-info .recent .small { max-width: calc(var(--S) * 0.12); }
-.table.landscape .center .round { font-size: 1.1em; color: #dfe9e3; }
+/* 中央面板：餘牌張數（放大）與剛打出的牌 */
 .wall-left { color: #dfe9e3; font-size: 1.2em; }
 .wall-left b { font-size: 1.9em; color: #fff; font-variant-numeric: tabular-nums; line-height: 1; }
-.table.landscape .timer { font-size: 3.2em; font-variant-numeric: tabular-nums; }
 .plate-score { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
 .plate-score b { font-size: 1.15em; color: var(--gold); }
 .plate-score span { font-size: 1.25em; font-weight: 700; }
-.table.landscape .nameplate.active .plate-score b { color: #fff; }
-.table.landscape .nameplate.active { background: rgba(212, 160, 23, 0.55); }
 .nameplate.at-right .plate-score, .nameplate.at-top .plate-score { justify-content: flex-end; }
-.table.portrait .recent { --tw: calc(var(--S) * 0.065); }
+.table.landscape .nameplate { font-size: max(13px, calc(var(--S) * 0.024)); max-width: calc(var(--S) * 0.24); }
+.table.landscape .center-info { inset: calc(var(--S) * 0.015); font-size: max(10px, calc(var(--S) * 0.026)); }
+.table.landscape .center-info .recent .small { max-width: calc(var(--S) * 0.24); }
 .table.landscape .stage { --gutter-min: clamp(150px, 22cqw, 300px); --S: min(100cqh, calc(100cqw - 2 * var(--gutter-min))); }
 .board {
   position: relative; width: var(--S); height: var(--S); flex: none;
@@ -238,10 +212,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   position: absolute; inset: calc(var(--S) * 0.055); display: grid; place-content: center; text-align: center; gap: 2px;
   font-size: calc(var(--S) * 0.02);
 }
-.center .round { font-weight: 700; }
 .center .small { color: #b7cfc3; }
-.timer { font-size: 2em; font-weight: 700; color: var(--gold); line-height: 1; }
-.timer.urgent { color: #ff6b5b; }
 
 /* 每一側：以自己在下方的方向排版，再整層旋轉（左側 90°、對家 180°、右側 -90°） */
 .side { position: absolute; inset: 0; pointer-events: none; }
@@ -249,15 +220,6 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .side.pos-top { transform: rotate(180deg); }
 .side.pos-left { transform: rotate(90deg); }
 .side > * { pointer-events: auto; }
-.side-plate {
-  position: absolute; left: 50%; top: calc(50% + var(--S) * 0.145 - var(--S) * 0.05); transform: translateX(-50%);
-  height: calc(var(--S) * 0.045); padding: 0 calc(var(--S) * 0.01); display: flex; align-items: center; gap: calc(var(--S) * 0.012);
-  font-size: calc(var(--S) * 0.022); font-variant-numeric: tabular-nums; border-radius: calc(var(--S) * 0.01);
-}
-.side-plate .wind { font-weight: 700; color: #f4f1e8; }
-.side-plate .score { color: #e9e3cf; }
-.side-plate.active { background: var(--gold); }
-.side-plate.active .wind, .side-plate.active .score { color: #fff; }
 .river {
   --tw: calc(var(--S) * 0.047);
   position: absolute; left: 50%; top: calc(50% + var(--S) * 0.155); transform: translateX(-50%);
@@ -276,7 +238,8 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 }
 .nameplate .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nameplate .badges .badge { margin: 0 4px 0 0; }
-.nameplate.active { box-shadow: 0 0 0 2px var(--gold); }
+.nameplate.active { box-shadow: 0 0 0 2px var(--gold); background: rgba(212, 160, 23, 0.55); }
+.nameplate.active .plate-score b { color: #fff; }
 .nameplate.at-bottom { left: 2%; bottom: 2%; }
 .nameplate.at-right { right: 2%; bottom: 2%; text-align: right; }
 .nameplate.at-top { right: 2%; top: 2%; text-align: right; }
@@ -414,7 +377,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 @keyframes reveal { from { opacity: 0; transform: rotateY(90deg); } to { opacity: 1; transform: none; } }
 @keyframes hide { to { opacity: 0; } }
 .swap-count { font-size: calc(var(--S) * 0.07); font-weight: 800; color: var(--gold); line-height: 1; min-height: 1em; animation: pop 0.3s ease-out; }
-.recent { --tw: calc(var(--S) * 0.05); display: grid; justify-items: center; gap: 2px; }
+.recent { --tw: calc(var(--S) * 0.065); display: grid; justify-items: center; gap: 2px; }
 .recent .small { font-size: max(10px, calc(var(--S) * 0.016)); color: #b7cfc3; max-width: calc(var(--S) * 0.17); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent.claiming .tile { outline: 2px solid var(--gold); animation: pop 0.25s ease-out; }
 .swap-mini {

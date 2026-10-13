@@ -66,15 +66,10 @@ function River({ p, lastDiscard, pointKind }: { p: PlayerView; lastDiscard: Game
   );
 }
 
-/** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉（門風與分數的小牌子只在直式顯示，橫式放在名牌裡） */
+/** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉（門風與分數在四角的名牌裡） */
 function Side({ p, n, game, pos, pointKind, showHand }: { p: PlayerView; n: number; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
-  const active = game.currentSeat === p.seat && game.phase === 'turn';
   return (
     <div className={`side pos-${pos}`}>
-      <div className={`side-plate ${active ? 'active' : ''}`}>
-        <span className="wind">{windLabel(p.wind)}</span>
-        <span className="score">{p.score}</span>
-      </div>
       <River p={p} lastDiscard={game.lastDiscard} pointKind={pointKind} />
       {showHand && (
         <div className="side-hand">
@@ -835,16 +830,12 @@ function OutcomeReco({ room, game }: { room: RoomView; game: GameView }) {
 /** 機率顯示為百分比：小於 10% 時留一位小數 */
 const percent = (p: number) => (p < 0.1 ? (Math.round(p * 1000) / 10).toString() : Math.round(p * 100).toString());
 
-function Center({ room, game, now }: { room: RoomView; game: GameView; now: number }) {
-  const remain = game.deadline ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+/** 牌桌中央：只放剛打出（或加槓）的牌與餘牌張數；局數與倒數在上方（直式）或右上（橫式） */
+function Center({ room, game }: { room: RoomView; game: GameView }) {
   const recent = game.kakanTile ?? game.recentDiscard;
   return (
     <div className="center">
-      <div className={`center-info ${recent ? 'has-recent' : ''}`}>
-        {/* 橫式：局數、剩幾張、倒數放大，各家的門風與分數放在名牌裡；直式這些都在上方狀態列 */}
-        <div className="round">
-          {t('第 {n} / {total} 局', { n: game.handNo, total: game.totalHands })}
-        </div>
+      <div className="center-info">
         <div className="wall-left">
           {tn('餘 {n} 張', { n: <b>{Math.max(0, game.wallRemaining - game.deadWall)}</b> })}
         </div>
@@ -857,7 +848,6 @@ function Center({ room, game, now }: { room: RoomView; game: GameView; now: numb
             <Tile tile={recent.tile} />
           </div>
         )}
-        {remain !== null && game.phase !== 'result' && <div className={`timer ${remain <= 5 ? 'urgent' : ''}`}>{remain}</div>}
       </div>
     </div>
   );
@@ -1067,34 +1057,13 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
-/** 直式上方的狀態列：局數、餘牌、倒數，以及四家的門風、名字與分數（輪到的人亮起） */
-function StatusBar({ room, game, now, view }: { room: RoomView; game: GameView; now: number; view: number }) {
+/** 局數與倒數：直式放在最上面一排，橫式放在右上角 */
+function TopBar({ game, now }: { game: GameView; now: number }) {
   const remain = game.deadline && game.phase !== 'result' ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
-  const me = view;
-  const n = room.players.length;
-  // 從自己開始，依下家、對家、上家的順序
-  const order = Array.from({ length: n }, (_, i) => room.players[(me + i) % n]);
   return (
-    <header className="status-bar">
-      <div className="status-row">
-        <span className="round">
-          {t('第 {n} / {total} 局・餘 {left}', { n: game.handNo, total: game.totalHands, left: Math.max(0, game.wallRemaining - game.deadWall) })}
-        </span>
-        {remain !== null && <span className={`status-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
-      </div>
-      <div className="score-row">
-        {order.map((p) => {
-          const active = game.currentSeat === p.seat && (game.phase === 'turn' || game.phase === 'claim');
-          return (
-            <span key={p.seat} className={`score-chip ${active ? 'active' : ''} ${p.seat === room.mySeat ? 'me' : ''}`}>
-              <b>{windLabel(p.wind)}</b>
-              <span className="nm">{p.seat === room.mySeat ? t('我') : playerName(p)}</span>
-              <VoiceMark userId={p.userId} />
-              <span className="pt">{p.score}</span>
-            </span>
-          );
-        })}
-      </div>
+    <header className="top-bar">
+      {remain !== null && <span className={`top-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
+      <span className="round">{t('第 {n} / {total} 局', { n: game.handNo, total: game.totalHands })}</span>
     </header>
   );
 }
@@ -1182,7 +1151,7 @@ function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = 
   const n = room.players.length;
   return (
     <div className="board">
-      <Center room={room} game={game} now={now} />
+      <Center room={room} game={game} />
       <CallOverlay game={game} discardButton={discardButton} />
       {overlay}
       {spectating ? null : game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
@@ -1251,6 +1220,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
           </div>
           {board}
           <div className="gutter right">
+            <TopBar game={game} now={now} />
             {reco}
             {my.melds && (
               <div className="side-melds">
@@ -1267,7 +1237,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   }
   return (
     <div className={`table portrait players-${room.players.length}`}>
-      <StatusBar room={room} game={game} now={now} view={room.mySeat!} />
+      <TopBar game={game} now={now} />
       <InfoCard room={room} game={game} tab={tab} setTab={setTab} hint={my.top} />
       <div className="stage">{board}</div>
       {my.hand}
@@ -1311,7 +1281,9 @@ function SpectatorLayout({ room, game, now, landscape }: { room: RoomView; game:
         <div className="stage">
           <div className="gutter left">{tools}</div>
           {board}
-          <div className="gutter right" />
+          <div className="gutter right">
+            <TopBar game={game} now={now} />
+          </div>
         </div>
         {modals}
       </div>
@@ -1319,7 +1291,7 @@ function SpectatorLayout({ room, game, now, landscape }: { room: RoomView; game:
   }
   return (
     <div className={`table portrait spectator players-${n}`}>
-      <StatusBar room={room} game={game} now={now} view={view} />
+      <TopBar game={game} now={now} />
       <div className="stage">{board}</div>
       {tools}
       {modals}

@@ -61,11 +61,12 @@ describe('牌桌畫面', () => {
     expect(render(room(), game())).not.toContain('長考');
   });
 
-  it('直式：上方狀態列（局數、四家分數，輪到的人亮起）與資訊卡分頁', () => {
+  it('直式：上方是倒數與局數，門風與分數在四角名牌（輪到的人亮起），中央只有餘牌與剛打出的牌', () => {
     const html = render(room(), game({ currentSeat: 1, deadline: Date.now() + 9500 }));
-    expect(html).toMatch(/class="status-bar"/);
-    expect(text(html)).toContain('第 1 / 4 局');
-    expect(html).toMatch(/class="score-chip active "[^>]*><b>南<\/b><span class="nm">電腦 1<\/span>/);
+    expect(text(html.match(/<header class="top-bar">.*?<\/header>/)![0]).replace(/\s+/g, ' ').trim()).toBe('⏱ 10 第 1 / 4 局');
+    expect(html).toMatch(/class="nameplate at-left active"><div class="plate-score"><b>南<\/b><span>0<\/span>/);
+    expect(text(html.match(/<div class="center-info">.*?<\/div><\/div>/)![0]).trim()).toMatch(/^餘 \d+ 張$/);
+    expect(html).not.toContain('side-plate');
     expect(html).toMatch(/class="info-card"/);
     expect(html).toContain('輪到 電腦 1 打牌');
     // 沒有換三張紀錄時不顯示該分頁；推薦牌型不再疊在牌桌上

@@ -124,7 +124,7 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 匯出結算圖片 | exportImage.ts、components/ExportButton.tsx |
 | 隨機座位 | room.ts `shuffleSeats`（房主、讓分跟著人走） |
 | 觀戰 | room.ts `spectate`/`spectators`、Table.tsx `SpectatorLayout` |
-| 橫式版面（名牌內分數、中央放大餘牌倒數） | Table.tsx `NamePlate`/`Center`、styles.css `.table.landscape` |
+| 四角名牌（門風、分數）、中央餘牌與打出的牌、局數與倒數（直式最上面、橫式右上） | Table.tsx `NamePlate`/`Center`/`TopBar`、styles.css `.table.landscape` |
 | 多國語言 | src/client/i18n/、`LangSelect` |
 | 語音 | voice.ts、components/Voice.tsx、server.ts `rtc` 轉送 |
 | 斷線暫停、AI 代打 | room.ts `updatePause`/`decide` |
