@@ -471,7 +471,7 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 @media (max-width: 340px) {
   .table.portrait .my-tools { gap: 3px; }
   .table.portrait .my-tools .chip-btn { font-size: 0.8em; min-height: 36px; }
-  .table.portrait .my-tools > .chip-btn:not(.icon) { padding: 5px 5px; }
+  .table.portrait .my-tools > .chip-btn:not(.icon) { padding: 5px 4px; }
   .table.portrait .my-tools .chip-btn.icon, .table.portrait .tools-menu .chip-btn { padding: 5px 6px; }
 }
 /* 矮的橫式畫面（手機橫放）：提示文字與按鈕縮小一點 */

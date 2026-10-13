@@ -12,7 +12,7 @@ describe('牌桌畫面', () => {
     expect(html).toContain('離開觀戰');
     expect(html).toContain('視角：');
     expect(html).not.toContain('推薦牌型');
-    expect(html).not.toContain('自動摸打');
+    expect(html).not.toContain('自動打');
     // 四家都顯示牌背（下方也是）
     expect((html.match(/class="side-hand"/g) ?? []).length).toBe(4);
   });
@@ -25,10 +25,11 @@ describe('牌桌畫面', () => {
     expect(html).toContain('不換');
   });
 
-  it('工具列：推薦牌型、自動和牌、自動摸打（開啟時高亮）；⚙ 選單在右上與局數放在一起', () => {
+  it('工具列：推薦、自動和、自動打、不鳴牌（開啟時高亮）；⚙ 選單在右上與局數放在一起', () => {
     const html = render(room(), game({ auto: { on: true, win: false, onlyMax: false, noCall: false } }));
-    expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動摸打/);
-    expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和牌/);
+    expect(html).toMatch(/class="chip-btn on" aria-pressed="true"[^>]*>自動打/);
+    expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>自動和</);
+    expect(html).toMatch(/class="chip-btn " aria-pressed="false"[^>]*>不鳴牌</);
     expect(html).toMatch(/<header class="top-bar">.*第 1 \/ 4 局.*aria-label="更多設定".*<\/header>/);
     expect(html.match(/<div class="my-tools">.*?<\/div>/)![0]).not.toContain('更多設定');
   });

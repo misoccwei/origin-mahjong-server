@@ -295,7 +295,7 @@ function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
   );
 }
 
-/** ⚙ 選單（右上角）：較少用的設定（只和最高分、電腦難度、全螢幕、離開） */
+/** ⚙ 選單（右上角）：較少用的設定（牌型表、只和最高分、電腦難度、語言、全螢幕、離開） */
 function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; setAuto: (patch: Partial<GameView['auto']>) => void }) {
   const [open, setOpen] = useState(false);
   const [showYaku, setShowYaku] = useState(false);
@@ -332,10 +332,6 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
         <div className="menu-pop" role="menu">
           <button onClick={() => (setShowYaku(true), setOpen(false))}>{t('牌型表')}</button>
           {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>{t('語音設定')}</button>}
-          <label className="toggle" title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')}>
-            <input type="checkbox" checked={game.auto.noCall} onChange={(e) => setAuto({ noCall: e.target.checked })} />
-            {t('不鳴牌（不吃碰槓）')}
-          </label>
           <label className={`toggle ${game.auto.on || game.auto.win ? '' : 'disabled'}`}>
             <input type="checkbox" disabled={!game.auto.on && !game.auto.win} checked={game.auto.onlyMax} onChange={(e) => setAuto({ onlyMax: e.target.checked })} />
             {t('只和最高分')}
@@ -482,13 +478,16 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
           <path fill="currentColor" d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2Zm-2 18h4v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1Z" />
         </svg>
-        {t('推薦牌型')}
+        {t('推薦')}
       </button>
       <button className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} onClick={() => setAuto({ win: !game.auto.win })}>
-        {t('自動和牌')}
+        {t('自動和')}
       </button>
       <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，下一局自動關閉')} onClick={() => setAuto({ on: !game.auto.on })}>
-        {t('自動摸打')}
+        {t('自動打')}
+      </button>
+      <button className={`chip-btn ${game.auto.noCall ? 'on' : ''}`} aria-pressed={game.auto.noCall} title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')} onClick={() => setAuto({ noCall: !game.auto.noCall })}>
+        {t('不鳴牌')}
       </button>
       <VoiceButtons />
     </div>
