@@ -35,8 +35,8 @@ src/shared/      前後端共用的純函式（無 I/O）
   scoring.ts     YAKU 牌型表（id 如 '8.1'，系列＝前兩段）、evaluateWin、waitingKinds、bestTenpaiScore、scoreByWait
   settlement.ts  加分式／零和式結算
   shanten.ts     向聽數（一般形可處理不足 13 張、pairFixed）、七對子、十三么九
-  recommend.ts   推薦牌型（普通型）：buildTargets 各牌型評估函式、winProbability、recommendYaku、suggestPass、fastestWin
-  outcome.ts     推薦牌型（進階型）：模擬摸打到聽牌，依最後和牌分數分組進張（只算 ≤2 向聽）
+  recommend.ts   推薦牌型（普通型）：buildTargets 各牌型評估函式（evaluate 向聽數、chance 特定牌的和牌率）、winProbability、recommendYaku、suggestPass、fastestWin
+  outcome.ts     推薦牌型（進階型）：展開摸／碰／吃到和牌，逐巡算和牌率與期望得分（只算 ≤2 向聽），可帶 claim 比較鳴與不鳴
   protocol.ts    WebSocket 訊息與快照型別、PROTOCOL_VERSION
   yakuInfo.ts    牌型表的說明與牌例
 src/server/
@@ -75,6 +75,10 @@ src/client/
   - 限定牌種的牌型用 `restricted()`；「缺幾張」是要摸的張數＝向聽數＋1，別混用。
   - 會用 `unseen`（4 − 看得到的張數）排除已經不可能的牌型。
   - `test/shared/recommendShape.test.ts` 用隨機手牌驗證（聽牌就和得出來、牌例算聽牌、每一步都能前進）；新增牌型目標時一定要讓它通過。
+- **推薦牌型的和牌率**：一般模型（`winProbability`）的參數 `TENPAI_UKEIRE`／`UKEIRE_DECAY`／`RESTRICTED_TENPAI_UKEIRE` 是用模擬自摸打牌擬合的；
+  一定要拿到特定牌的牌型要給 `chance`（特定牌拿得到的機率 × 其餘部分），只看有效牌會嚴重高估（anyOf 合併有效牌、其餘部分的牌被算進來）。
+  同一牌型的不同做法要分開成多個目標（id 相同），不要合併。改模型時用模擬比對預測與實際和牌率（單人模擬時記得吃碰要關掉：`players: 1`）。
+- **進階型的效能**：`outcome.ts` 最壞約 0.5 秒（2 向聽、手上 14 張）。為了做牌而鳴（向聽數不變）只在一向聽以內展開、改聽只在目前已聽牌時展開，放寬會讓局面數暴增；前端在 `useEffect` 裡算，不要改回 `useMemo`。
 - **效能**：AI（normal/hard）每一步都呼叫 `recommendYaku`；評估函式會被呼叫上千次，避免在裡面配置陣列或產生字串。`shantenStandard` 以 5 進位整數為快取 key。改了之後看 `simulation.test.ts` 的「4人困難 AI」時間（約 10 秒，明顯變慢要處理）。
 - **計時與測試**：`RoomDeps.resultMs` 只給測試用來縮短結算倒數；正式由 `settings.resultSeconds` 決定（0 = 等所有人按下一局）。
 - **隨機座位預設開啟**：WebSocket 測試客戶端建立房間時預設送 `randomSeats: false`（`test/support/wsClient.ts`），測試要固定座位才不會亂。
@@ -111,7 +115,7 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | --- | --- |
 | 打牌、鳴牌按鈕（含固定位置的「打出」） | Table.tsx `CallOverlay`、`useMyArea` |
 | 打出前提示每張聽牌的牌型與分數 | Table.tsx `DiscardWaits`、scoring.ts `scoreByWait` |
-| 推薦牌型（普通型／進階型切換） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`、recommend.ts、outcome.ts |
+| 推薦牌型（普通型／進階型切換、鳴牌時比較鳴與不鳴） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`、recommend.ts、outcome.ts |
 | AI 策略（依和牌最低分數、換三張） | ai.ts `decideAction`（`recInput`、`needsYaku`、`suggestPass`） |
 | 不鳴牌、自動摸打、自動和牌 | ai.ts `autoAction`、room.ts `setAuto`/`autoOpts`、Table.tsx `ToolsMenu` |
 | 結算倒數、局結果、重看各局 | room.ts `schedule`/`advanceHand`/`resultView`/`replays`、Table.tsx `ResultBody`、RoomScreens.tsx `ReplayModal` |

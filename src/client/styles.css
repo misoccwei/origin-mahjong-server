@@ -438,6 +438,7 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .outcome-plan { display: grid; gap: 6px; margin-bottom: 10px; }
 .reco-panel.card .outcome-plan ol { grid-template-columns: 1fr; }
 .outcome-draws { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.outcome-rate { float: right; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .reco-group-title { font-weight: 700; color: var(--gold); }
 .reco-ev { font-weight: 600; font-variant-numeric: tabular-nums; }
 .reco-title { display: flex; justify-content: space-between; font-weight: 600; }

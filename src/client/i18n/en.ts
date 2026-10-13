@@ -205,8 +205,8 @@ export const en: Record<string, string> = {
   '門清（只能自己摸進來）': 'Concealed (self-draw only)',
   '和牌率 {rate}%・期望 {ev} 分': 'Win {rate}% · EV {ev} pts',
   '朝這個牌型打': 'For this hand, discard',
-  '依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數），已經沒有剩牌的牌型不列出；部分牌型為近似值，僅供參考。':
-    'Useful tiles, win rate and expected value (win rate × points) are estimated from your hand and visible tiles. Impossible hands are hidden; some values are approximate.',
+  '依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數）。一定要拿到特定牌的牌型（番牌、三元、一氣通貫、三色同順、暗刻、七對子、五門齊等）以那幾張牌拿得到的機率計算；已經沒有剩牌或和牌率不到 1% 的牌型不列出。僅供參考。':
+    'Useful tiles, win rate and expected value (win rate × points) are estimated from your hand and visible tiles. Hands that need specific tiles (Value Triplet, dragons, Pure Straight, Mixed Triple Sequence, concealed triplets, Seven Pairs, All Five Types, etc.) use the chance of getting those tiles. Impossible hands and hands under 1% are hidden. For reference only.',
   '目前 {n} 向聽。進階型只計算 {max} 向聽以內（再遠變化太多），請先參考普通型。':
     'You are {n} tiles away. Advanced hints only cover up to {max} away; use Basic for now.',
   '已經是和牌形。': 'Your hand is already complete.',
@@ -215,8 +215,12 @@ export const en: Record<string, string> = {
   '之後（{shanten}）': 'then ({shanten})',
   '再進': 'Draw',
   '剩 {n} 張': '{n} left',
-  '往下模擬摸打到聽牌，以最後和牌的分數（自摸或銃和取高、不含偶然類）比較；每個方向取之後都摸到好牌的最好情況，看不到剩的牌與未達和牌最低分數的和法不算。':
-    'Simulates draws and discards until ready and compares the final winning score (higher of tsumo/ron, no luck hands), assuming the best later draws. Tiles with none left and wins below the minimum are ignored.',
+  '往下展開摸牌、碰、吃到和牌，依剩下的巡數估計每種打法的和牌率與期望得分（和牌分數 × 機率；自摸、銃和分開計分，不含偶然類），依期望得分排序。每一組是第一張拿到的牌與最可能的和法，百分比是經由這組牌和牌的機率；聽牌時也會考慮摸到某張後改聽。看不到剩的牌與未達和牌最低分數的和法不算。':
+    'Expands draws, pon and chi until a win and estimates each option\'s win rate and expected score (score × probability; tsumo and ron scored separately, no luck hands) over the remaining turns, sorted by expected score. Each row is the first tile you get and the most likely final hand; the percentage is the chance of winning through that row. When ready, it also considers changing your wait after a draw. Tiles with none left and wins below the minimum are ignored.',
+  '計算中…': 'Calculating…',
+  '摸到改聽': 'Draw & re-wait',
+  '吃': 'Chi',
+  '不鳴': 'No call',
   '餘 {n} 張': '{n} left',
   '{name} 加槓': '{name} added kan',
   '{name} 打出': '{name} discarded',

@@ -97,5 +97,19 @@ describe('推薦牌型（牌效率）', () => {
     expect(recommendYaku({ ...input(hand), visible }, 20).map((x) => x.name)).not.toContain('大三元');
     expect(recommendYaku(input(hand), 20).map((x) => x.name)).toContain('大三元');
   });
-});
 
+  it('一定要拿到特定牌的牌型依那幾張牌估計：只有一張中的番牌，和牌率遠低於已有一對中', () => {
+    // 123m 678p 789s 23s ＋ 中東（只有一張中）或 中中
+    const yakuhai = (hand: string) => recommendYaku({ ...input(hand), drawsLeft: 15 }, 20).find((x) => x.name === '番牌')!;
+    const one = yakuhai('🀇🀈🀉🀞🀟🀠🀖🀗🀘🀑🀒🀄🀀');
+    const two = yakuhai('🀇🀈🀉🀞🀟🀠🀖🀗🀘🀑🀒🀄🀄');
+    expect(one.winRate).toBeLessThan(two.winRate / 3);
+  });
+
+  it('還差很遠的牌型不會估出很高的和牌率（以前 5 向聽的三色同順估到 20% 以上）', () => {
+    const hand = '🀏🀚🀝🀞🀟🀠🀔🀕🀖🀘🀀🀅🀆';
+    const sanshoku = recommendYaku({ ...input(hand), drawsLeft: 15, minWinScore: 20 }, 20).find((x) => x.name === '三色同順')!;
+    expect(sanshoku.shanten).toBeGreaterThanOrEqual(5);
+    expect(sanshoku.winRate).toBeLessThan(0.06);
+  });
+});
