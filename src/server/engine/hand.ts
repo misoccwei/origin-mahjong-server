@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import type { AvailableActions, GameAction } from '../../shared/protocol.js';
+import type { AvailableActions, GameAction, WinScoreView } from '../../shared/protocol.js';
 import { DEAD_WALL, baseScoreFor, seatWindOf, type Meld, type RuleSettings } from '../../shared/rules.js';
 import { bestTenpaiScore, evaluateWin, isWinningShape, waitingKinds, type HandScore, type WinFlags } from '../../shared/scoring.js';
 import { settle, type SettlementLine } from '../../shared/settlement.js';
@@ -309,7 +309,8 @@ export class Hand {
     const hand = this.hands[seat];
     const counts = countOf(hand);
     const avail: AvailableActions = { kind: 'turn', discard: [...hand] };
-    if (this.drewThisTurn && this.evaluateTsumo(seat)) avail.tsumo = true;
+    const tsumo = this.drewThisTurn ? this.evaluateTsumo(seat) : null;
+    if (tsumo) (avail.tsumo = true), (avail.winScore = winScoreView(tsumo));
     if (this.canDraw) {
       const ankan = [...counts.entries()].filter(([, c]) => c === 4).map(([k]) => k);
       if (ankan.length) avail.ankan = ankan;
@@ -462,7 +463,8 @@ export class Hand {
       const same = hand.filter((t) => kindOf(t) === k);
       const avail: AvailableActions = { kind: 'claim' };
       let any = false;
-      if (this.evaluateRon(seat, tile, { houtei })) (avail.ron = true), (any = true);
+      const ron = this.evaluateRon(seat, tile, { houtei });
+      if (ron) (avail.ron = true), (avail.winScore = winScoreView(ron)), (any = true);
       if (same.length >= 2) (avail.pon = true), (any = true);
       if (same.length >= 3 && this.canDraw) (avail.minkan = true), (any = true);
       if (i === 1) {
@@ -529,7 +531,8 @@ export class Hand {
     this.responses.clear();
     for (let i = 1; i < this.n; i++) {
       const seat = (kakanSeat + i) % this.n;
-      if (this.evaluateRon(seat, tile, { chankan: true })) this.pending.set(seat, { kind: 'chankan', ron: true });
+      const ron = this.evaluateRon(seat, tile, { chankan: true });
+      if (ron) this.pending.set(seat, { kind: 'chankan', ron: true, winScore: winScoreView(ron) });
     }
     if (this.pending.size === 0) this.completeKakan();
   }
@@ -645,3 +648,6 @@ export function chiOptions(hand: TileId[], tile: TileId): [TileId, TileId][] {
   }
   return out;
 }
+
+/** 按鈕上顯示的和牌分數與牌型 */
+const winScoreView = (s: HandScore): WinScoreView => ({ total: s.total, yaku: s.yaku.map((y) => ({ name: y.name, count: y.count })) });

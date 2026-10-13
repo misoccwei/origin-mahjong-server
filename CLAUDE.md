@@ -60,7 +60,7 @@ src/client/
 
 ## 必須遵守的慣例與陷阱
 
-- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**12**。
+- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**13**。
 - **新增規則設定**：`rules.ts` 的 `RuleSettings`＋`defaultSettings`＋`sanitizeSettings`（範圍檢查）→ `Lobby.tsx` 的 `SettingsForm` → 需要時 `RoomScreens.tsx` 的 `rulesSummary` → `test/shared/rules.test.ts` → 翻譯 → README → 協定版本加一。
 - **多國語言（最常踩的坑）**：
   - 所有看得到的字都要包 `t('繁中原文')`；含元件（例如牌）的用 `tn('打出 {tile}', { tile: <Tile …/> })`；變數用 `{name}`，不要用字串串接拼句子（語序不同）。
@@ -114,7 +114,8 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 功能 | 主要位置 |
 | --- | --- |
 | 打牌、鳴牌按鈕（含固定位置的「打出」） | Table.tsx `CallOverlay`、`useMyArea` |
-| 打出前提示每張聽牌的牌型與分數 | Table.tsx `DiscardWaits`、scoring.ts `scoreByWait` |
+| 聽牌／打出前提示每張聽牌的牌型與分數 | Table.tsx `Waits`/`DiscardWaits`/`WaitList`（`waitRows` 自摸、銃和分開算） |
+| 自摸／和按鈕上的分數與牌型 | hand.ts `winScoreView`（`AvailableActions.winScore`）、Table.tsx `winLabel` |
 | 推薦牌型（普通型／進階型切換、鳴牌時比較鳴與不鳴） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`、recommend.ts、outcome.ts |
 | AI 策略（依和牌最低分數、換三張） | ai.ts `decideAction`（`recInput`、`needsYaku`、`suggestPass`） |
 | 不鳴牌、自動摸打、自動和牌 | ai.ts `autoAction`、room.ts `setAuto`/`autoOpts`、Table.tsx `ToolsMenu` |

@@ -122,4 +122,18 @@ describe('牌桌畫面', () => {
     expect(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: null }))).toContain('未達和牌最低分數');
   });
 
+  it('聽牌時列出每張聽的牌和了幾分與牌型', () => {
+    // 123456m 123p 123s 東：單騎東
+    const out = text(render(room(), game({ myWaits: [{ kind: 27, left: 3 }], myWaitScore: { min: 55, max: 55 } })));
+    expect(out).toMatch(/×3 \d+ 分 [^ ]*平和/);
+  });
+
+  it('和牌、自摸按鈕上顯示現在和的分數與牌型', () => {
+    const winScore = { total: 45, yaku: [{ name: '混一色', count: 1 }, { name: '番牌', count: 2 }] };
+    const ron = text(render(room(), game({ phase: 'claim', currentSeat: 1, recentDiscard: { seat: 1, tile: tid(27) }, pending: { kind: 'claim', ron: true, winScore } })));
+    expect(ron).toContain('和 45 分 混一色・番牌×2');
+    const tsumo = text(render(room(), game({ pending: { kind: 'turn', discard: HAND, tsumo: true, winScore } })));
+    expect(tsumo).toContain('自摸 45 分 混一色・番牌×2');
+  });
+
 });

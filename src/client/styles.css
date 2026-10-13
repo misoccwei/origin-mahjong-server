@@ -354,6 +354,12 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
   border: 3px solid rgba(255, 255, 255, 0.85); border-radius: 14px; color: #fff; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 .call.win, .call.win:hover:not(:disabled) { background: linear-gradient(180deg, #e74c3c, #a93226); }
+/* 自摸／和：按鈕上寫現在和的分數，下面一行是牌型 */
+.call.win { flex-direction: column; gap: 0; padding-top: 4px; padding-bottom: 4px; }
+.call-main { display: inline-flex; align-items: baseline; gap: 6px; }
+.call-score { font-size: 0.75em; color: #ffe08a; white-space: nowrap; }
+.call-yaku { font-size: max(11px, 0.5em); font-weight: 600; letter-spacing: 0; max-width: min(16em, 38vw); line-height: 1.3; text-align: center;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .call.win { animation: pulse 1s ease-in-out infinite; }
 .call.discard, .call.discard:hover:not(:disabled) { background: linear-gradient(180deg, #e0b23a, #b8890f); }
 .call.pon, .call.pon:hover:not(:disabled) { background: linear-gradient(180deg, #2f80ed, #1c5bb8); }

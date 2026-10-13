@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 
 // ---- 遊戲行動 ----
 
@@ -38,6 +38,13 @@ export interface AvailableActions {
   chi?: [TileId, TileId][];
   /** 聽牌時，打出各張牌後所聽的牌（提示用） */
   tenpaiHints?: Record<number, TileKind[]>;
+  /** 可以自摸／和（含搶槓）時，現在和的分數與牌型（含偶然類），顯示在按鈕上 */
+  winScore?: WinScoreView;
+}
+
+export interface WinScoreView {
+  total: number;
+  yaku: { name: string; count: number }[];
 }
 
 // ---- 狀態快照 ----

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
-import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
-import { scoreByWait, type HandScore } from '../../shared/scoring.js';
+import type { GameView, HandResultView, PlayerView, RoomView, WinScoreView } from '../../shared/protocol.js';
+import { evaluateWin, type HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
 import { OUTCOME_MAX_SHANTEN, outcomeRecommend, type OutcomeGroup, type OutcomePlan, type OutcomeResult } from '../../shared/outcome.js';
 import { baseScoreFor, type Meld } from '../../shared/rules.js';
@@ -131,7 +131,7 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
   const buttons: ReactElement[] = [];
   if (p.kind === 'turn') {
     if (discardButton) buttons.push(discardButton);
-    if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>{t('自摸')}</button>);
+    if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>{winLabel(t('自摸'), p.winScore)}</button>);
     for (const k of p.ankan ?? []) buttons.push(<button key={'an' + k} className="call kan" onClick={() => act({ type: 'ankan', kind: k })}>{tn('暗槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
     for (const k of p.kakan ?? []) buttons.push(<button key={'ka' + k} className="call kan" onClick={() => act({ type: 'kakan', kind: k })}>{tn('加槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
     // 自動摸打遇到能槓時會停下來問：不槓就照常摸切
@@ -139,7 +139,7 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
       buttons.push(<button key="nokan" className="call skip" onClick={() => act({ type: 'discard', tile: game.myDrawn! })}>{t('不槓（摸切）')}</button>);
     }
   } else {
-    if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{p.kind === 'chankan' ? t('搶槓') : t('和')}</button>);
+    if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{winLabel(p.kind === 'chankan' ? t('搶槓') : t('和'), p.winScore)}</button>);
     // 不鳴牌：只剩和與略過
     if (!game.auto.noCall && p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>{t('槓')}</button>);
     if (!game.auto.noCall && p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>{t('碰')}</button>);
@@ -163,21 +163,104 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
   return <div className="call-overlay">{buttons}</div>;
 }
 
-function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['myWaitScore'] | undefined }) {
+/** 自摸／和按鈕：現在和的分數，下面一行是牌型 */
+function winLabel(label: string, score: WinScoreView | undefined) {
+  if (!score) return label;
   return (
     <>
-      {t('聽牌：')}
-      {waits.map((w) => (
-        <span key={w.kind} className={`wait ${w.left === 0 ? 'none' : ''}`}>
-          <Tile kind={w.kind} small />
-          <span className="left">×{w.left}</span>
-        </span>
-      ))}
-      {/* 預計和牌分數（所有聽的牌、自摸或銃和；不含偶然類），最高與最低相同時只寫一個 */}
-      <span className="wait-score">
-        {score ? (score.min === score.max ? t('預計 {n} 分', { n: score.max }) : t('預計 {min}～{max} 分', { min: score.min, max: score.max })) : t('未達和牌最低分數，不能和')}
+      <span className="call-main">
+        {label}
+        <span className="call-score">{t('{n} 分', { n: score.total })}</span>
+      </span>
+      {/* 牌型太長時最多兩行（完整的在手牌上方的聽牌列表） */}
+      <span className="call-yaku" title={yakuText(score.yaku)}>
+        {yakuText(score.yaku)}
       </span>
     </>
+  );
+}
+
+const yakuText = (yaku: { name: string; count: number }[]) => yaku.map((y) => (y.count > 1 ? `${t(y.name)}×${y.count}` : t(y.name))).join(t('・'));
+
+interface WaitRow {
+  kind: TileKind;
+  left: number;
+  tsumo: HandScore | null;
+  ron: HandScore | null;
+}
+
+/** 手牌（13 張減鳴牌）聽的每一張牌：自摸與銃和各自的和牌（不含偶然類） */
+function waitRows(room: RoomView, game: GameView, concealed: TileKind[], waits: TileKind[]): WaitRow[] {
+  const me = room.players[room.mySeat!];
+  const { visible } = recommendInput(room, game);
+  const score = (w: TileKind, tsumo: boolean) =>
+    evaluateWin({
+      concealed: [...concealed, w],
+      melds: me.melds,
+      winTile: w,
+      tsumo,
+      seatWind: me.wind ?? 27,
+      advanced: room.settings.advanced,
+      baseScore: baseScoreFor(room.settings, me.seat),
+      expansion: room.settings.expansion,
+    });
+  return waits.map((k) => ({ kind: k, left: Math.max(0, 4 - visible[k]), tsumo: score(k, true), ron: score(k, false) }));
+}
+
+/** 聽的每一張牌：剩幾張、和了幾分（自摸與銃和不同時分開寫）、牌型；未達和牌最低分數的標明 */
+function WaitList({ rows, min }: { rows: WaitRow[]; min: number }) {
+  return (
+    <ul>
+      {rows.map((r) => {
+        const best = r.tsumo && (!r.ron || r.tsumo.total >= r.ron.total) ? r.tsumo : r.ron;
+        const ok = (s: HandScore | null) => !!s && s.total >= min;
+        return (
+          <li key={r.kind} className={r.left === 0 || !ok(best) ? 'none' : ''}>
+            <span className="wait">
+              <Tile kind={r.kind} small />
+              <span className="left">×{r.left}</span>
+            </span>
+            {best ? (
+              <>
+                <span className="wait-score">
+                  {r.tsumo && r.ron && r.tsumo.total !== r.ron.total
+                    ? t('自摸 {a}・銃和 {b} 分', { a: r.tsumo.total, b: r.ron.total })
+                    : t('{n} 分', { n: best.total })}
+                </span>
+                <span className="yaku-names">
+                  {yakuText(best.yaku)}
+                  {!ok(best) ? t('（未達和牌最低分數，不能和）') : !ok(r.ron) ? t('（銃和未達和牌最低分數，只能自摸）') : ''}
+                </span>
+              </>
+            ) : (
+              <span className="yaku-names">{t('不能和')}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 聽牌時：每張聽的牌各自和了幾分（上面一行是全部聽牌的分數範圍） */
+function Waits({ room, game }: { room: RoomView; game: GameView }) {
+  const me = room.players[room.mySeat!];
+  const rows = useMemo(
+    () => waitRows(room, game, game.myHand.map(kindOf), game.myWaits.map((w) => w.kind)),
+    [game.myHand, game.myWaits, me.melds, me.wind, room.settings, room.players],
+  );
+  const score = game.myWaitScore;
+  return (
+    <div className="discard-waits">
+      <div>
+        {t('聽牌：')}
+        {/* 預計和牌分數（所有聽的牌、自摸或銃和；不含偶然類），最高與最低相同時只寫一個 */}
+        <span className="wait-score">
+          {score ? (score.min === score.max ? t('預計 {n} 分', { n: score.max }) : t('預計 {min}～{max} 分', { min: score.min, max: score.max })) : t('未達和牌最低分數，不能和')}
+        </span>
+      </div>
+      <WaitList rows={rows} min={room.settings.minWinScore} />
+    </div>
   );
 }
 
@@ -190,37 +273,14 @@ function DiscardWaits({ room, game, discard, waits }: { room: RoomView; game: Ga
   const rows = useMemo(() => {
     const concealed = game.myHand.map(kindOf);
     concealed.splice(concealed.indexOf(discard), 1);
-    const scores = scoreByWait(concealed, me.melds, me.wind ?? 27, room.settings.advanced, baseScoreFor(room.settings, me.seat), room.settings.expansion);
-    const { visible } = recommendInput(room, game);
-    return waits.map((k) => ({ kind: k, left: Math.max(0, 4 - visible[k]), score: scores.find((s) => s.tile === k)?.score ?? null }));
+    return waitRows(room, game, concealed, waits);
   }, [game.myHand, discard, waits, me.melds, me.wind, room.settings, room.players]);
-  const min = room.settings.minWinScore;
   return (
     <div className="discard-waits">
       <div>
         {tn('打出 {tile} 後聽：', { tile: <Tile kind={discard} small /> })}
       </div>
-      <ul>
-        {rows.map((r) => (
-          <li key={r.kind} className={r.left === 0 || !r.score || r.score.total < min ? 'none' : ''}>
-            <span className="wait">
-              <Tile kind={r.kind} small />
-              <span className="left">×{r.left}</span>
-            </span>
-            {r.score ? (
-              <>
-                <span className="wait-score">{t('{n} 分', { n: r.score.total })}</span>
-                <span className="yaku-names">
-                  {r.score.yaku.map((y) => (y.count > 1 ? `${t(y.name)}×${y.count}` : t(y.name))).join(t('・'))}
-                  {r.score.total < min && t('（未達和牌最低分數，不能和）')}
-                </span>
-              </>
-            ) : (
-              <span className="yaku-names">{t('不能和')}</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      <WaitList rows={rows} min={room.settings.minWinScore} />
     </div>
   );
 }
@@ -382,7 +442,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         ) : game.phase === 'passReveal' ? (
           game.passReceived ? t('收到換來的 3 張牌，倒數結束後放進手牌') : t('這次沒有換到牌')
         ) : game.myWaits.length > 0 ? (
-          <Waits waits={game.myWaits} score={game.myWaitScore} />
+          <Waits room={room} game={game} />
         ) : p?.kind === 'turn' ? (
           t('點選一張牌，再按「打出」或再點一次')
         ) : passing ? (

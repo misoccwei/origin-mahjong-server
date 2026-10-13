@@ -155,6 +155,8 @@ export const en: Record<string, string> = {
   '打出 {tile} 後聽：': 'Discard {tile} to wait on:',
   '{n} 分': '{n} pts',
   '（未達和牌最低分數，不能和）': ' (below the minimum score, cannot win)',
+  '自摸 {a}・銃和 {b} 分': 'Tsumo {a} · Ron {b} pts',
+  '（銃和未達和牌最低分數，只能自摸）': ' (ron is below the minimum score; tsumo only)',
   '不能和': 'Cannot win',
   '更多設定': 'More settings',
   '語音設定': 'Voice settings',
