@@ -16,6 +16,19 @@ export interface Meld {
 export const isOpenMeld = (m: Meld) => m.type !== 'ankan';
 export const isKanMeld = (m: Meld) => m.type === 'minkan' || m.type === 'kakan' || m.type === 'ankan';
 
+/**
+ * 鳴牌由左到右的排列：被鳴的那張放在來源方向（原點麻將順時針，下家在左、對家在上、上家在右），
+ * 下家→最左、對家→第二張、上家→最右；其餘牌維持由小到大。seat 是鳴牌者、n 是人數
+ */
+export function meldTileOrder(m: Meld, seat: number, n: number): TileId[] {
+  if (m.calledTile === undefined || m.from === undefined) return m.tiles;
+  const rest = m.tiles.filter((t) => t !== m.calledTile);
+  const rel = (m.from - seat + n) % n;
+  const at = n > 2 && rel === 1 ? 0 : n > 2 && rel === n - 1 ? rest.length : 1;
+  rest.splice(at, 0, m.calledTile);
+  return rest;
+}
+
 export type ScoringMode = 'additive' | 'zeroSum';
 export type AILevel = 'beginner' | 'easy' | 'normal' | 'hard';
 

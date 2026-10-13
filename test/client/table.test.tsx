@@ -44,6 +44,18 @@ describe('牌桌畫面', () => {
     expect(render(r, game({ myHand: [...HAND.slice(0, 10), drawn], myDrawn: drawn }))).toContain('--n:11.5');
   });
 
+  it('鳴牌轉橫的那張朝向來源：上家（右）在最右、下家（左）在最左', () => {
+    const sideways = (from: number) => {
+      const meld = { type: 'pon' as const, tiles: [tid(27, 0), tid(27, 1), tid(27, 2)], calledTile: tid(27, 0), from };
+      const r = room({ players: [0, 1, 2, 3].map((s) => player(s, s === 0 ? { melds: [meld] } : {})) });
+      const area = render(r, game()).match(/class="meld-area">(.*?)<\/div>/)![1];
+      return [...area.matchAll(/class="tile([^"]*)"/g)].map((m) => m[1].includes('sideways'));
+    };
+    expect(sideways(3)).toEqual([false, false, true]);
+    expect(sideways(2)).toEqual([false, true, false]);
+    expect(sideways(1)).toEqual([true, false, false]);
+  });
+
   it('長考：可以用時顯示按鈕', () => {
     expect(render(room(), game({ thinkAvailable: true }))).toContain('長考 +60 秒');
     expect(render(room(), game())).not.toContain('長考');

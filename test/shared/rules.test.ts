@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseScoreFor, defaultSettings, sanitizeSettings } from '../../src/shared/rules.js';
+import { baseScoreFor, defaultSettings, meldTileOrder, sanitizeSettings, type Meld } from '../../src/shared/rules.js';
 
 describe('規則設定', () => {
   it('底分依規則預設，可在讓分中逐人設定', () => {
@@ -34,5 +34,29 @@ describe('規則設定', () => {
     expect(two.playerCount).toBe(2);
     expect(two.rounds).toBe(2);
     expect(two.handicaps).toEqual({});
+  });
+});
+
+describe('鳴牌的排列', () => {
+  // 座位 1 碰了 5 萬（4 張中的 16），其餘兩張是 17、18
+  const pon = (from: number): Meld => ({ type: 'pon', tiles: [16, 17, 18], calledTile: 16, from });
+
+  it('被鳴的牌放在來源方向：下家（左）最左、對家中間、上家（右）最右', () => {
+    expect(meldTileOrder(pon(2), 1, 4)).toEqual([16, 17, 18]);
+    expect(meldTileOrder(pon(3), 1, 4)).toEqual([17, 16, 18]);
+    expect(meldTileOrder(pon(0), 1, 4)).toEqual([17, 18, 16]);
+  });
+
+  it('三人時只有左右，兩人時對家放中間；明槓同樣依方向', () => {
+    expect(meldTileOrder(pon(2), 1, 3)).toEqual([16, 17, 18]);
+    expect(meldTileOrder(pon(0), 1, 3)).toEqual([17, 18, 16]);
+    expect(meldTileOrder(pon(0), 1, 2)).toEqual([17, 16, 18]);
+    const kan: Meld = { type: 'minkan', tiles: [16, 17, 18, 19], calledTile: 18, from: 0 };
+    expect(meldTileOrder(kan, 1, 4)).toEqual([16, 17, 19, 18]);
+  });
+
+  it('暗槓不變', () => {
+    const ankan: Meld = { type: 'ankan', tiles: [16, 17, 18, 19] };
+    expect(meldTileOrder(ankan, 1, 4)).toEqual([16, 17, 18, 19]);
   });
 });

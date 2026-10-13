@@ -3,7 +3,7 @@ import type { GameView, HandResultView, PlayerView, RoomView, WinScoreView } fro
 import { evaluateWin, type HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
 import { OUTCOME_MAX_SHANTEN, outcomeRecommend, type OutcomeGroup, type OutcomePlan, type OutcomeResult } from '../../shared/outcome.js';
-import { baseScoreFor, type Meld } from '../../shared/rules.js';
+import { baseScoreFor, meldTileOrder, type Meld } from '../../shared/rules.js';
 import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
 import { act, send, type AppState } from '../net.js';
 import { AILevelSelect } from './Inputs.js';
@@ -38,11 +38,11 @@ function positionOf(seat: number, me: number, n: number): Pos {
   return (['bottom', 'left', 'top', 'right'] as const)[rel];
 }
 
-function MeldView({ meld, small }: { meld: Meld; small?: boolean }) {
+function MeldView({ meld, seat, n, small }: { meld: Meld; seat: number; n: number; small?: boolean }) {
   const hidden = meld.tiles[0] === -1;
   return (
     <span className="meld">
-      {meld.tiles.map((t, i) => {
+      {meldTileOrder(meld, seat, n).map((t, i) => {
         const faceDown = hidden || (meld.type === 'ankan' && (i === 0 || i === 3));
         return <Tile key={i} tile={t} back={faceDown} small={small} sideways={t === meld.calledTile} />;
       })}
@@ -67,7 +67,7 @@ function River({ p, lastDiscard, pointKind }: { p: PlayerView; lastDiscard: Game
 }
 
 /** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉（門風與分數的小牌子只在直式顯示，橫式放在名牌裡） */
-function Side({ p, game, pos, pointKind, showHand }: { p: PlayerView; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
+function Side({ p, n, game, pos, pointKind, showHand }: { p: PlayerView; n: number; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
   const active = game.currentSeat === p.seat && game.phase === 'turn';
   return (
     <div className={`side pos-${pos}`}>
@@ -87,7 +87,7 @@ function Side({ p, game, pos, pointKind, showHand }: { p: PlayerView; game: Game
             </span>
           )}
           {p.melds.map((m, i) => (
-            <MeldView key={i} meld={m} />
+            <MeldView key={i} meld={m} seat={p.seat} n={n} />
           ))}
         </div>
       )}
@@ -466,7 +466,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
     me.melds.length > 0 ? (
       <div className="meld-area">
         {me.melds.map((m, i) => (
-          <MeldView key={i} meld={m} />
+          <MeldView key={i} meld={m} seat={me.seat} n={room.players.length} />
         ))}
       </div>
     ) : null;
@@ -864,7 +864,7 @@ function Center({ room, game, now }: { room: RoomView; game: GameView; now: numb
 }
 
 /** 手牌一排；extra 是和牌的那張（或聽牌最高分的那張），與手牌隔開並標亮 */
-function HandRow({ hand, melds, extra }: { hand: TileId[]; melds: Meld[]; extra?: { tile?: TileId; kind?: TileKind } }) {
+function HandRow({ hand, melds, seat, n, extra }: { hand: TileId[]; melds: Meld[]; seat: number; n: number; extra?: { tile?: TileId; kind?: TileKind } }) {
   return (
     <div className="win-hand">
       {hand.map((t) => (
@@ -876,7 +876,7 @@ function HandRow({ hand, melds, extra }: { hand: TileId[]; melds: Meld[]; extra?
         </span>
       )}
       {melds.map((m, i) => (
-        <MeldView key={i} meld={m} small />
+        <MeldView key={i} meld={m} seat={seat} n={n} small />
       ))}
     </div>
   );
@@ -935,7 +935,7 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
                 <span className="tag win">{w.tsumo ? t('自摸') : t('銃和・放銃 {name}', { name: names[w.from!] })}</span>
                 <Delta d={d} />
               </header>
-              <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} extra={{ tile: w.tile }} />
+              <HandRow hand={r.hands[s].filter((x) => x !== w.tile)} melds={r.melds[s]} seat={s} n={r.melds.length} extra={{ tile: w.tile }} />
               <YakuChips score={w.score} totalLabel={t('和牌分數')} />
             </section>
           );
@@ -958,7 +958,7 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
               <div className="small muted">
                 {t(tp.best.tsumo ? '最高分的和法：自摸「{tile}」（聽牌得分依此計算）' : '最高分的和法：銃和「{tile}」（聽牌得分依此計算）', { tile: tileLabel(tp.best.tile) })}
               </div>
-              <HandRow hand={r.hands[s]} melds={r.melds[s]} extra={{ kind: tp.best.tile }} />
+              <HandRow hand={r.hands[s]} melds={r.melds[s]} seat={s} n={r.melds.length} extra={{ kind: tp.best.tile }} />
               <YakuChips score={tp.best.score} totalLabel={t('最高和牌分數')} />
               {capped && <div className="small muted">{t('聽牌得分不超過和牌者的得分，實得 {n} 分', { n: d })}</div>}
             </section>
@@ -974,7 +974,7 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
               <Delta d={d} />
             </header>
             {visible ? (
-              <HandRow hand={r.hands[s]} melds={r.melds[s]} />
+              <HandRow hand={r.hands[s]} melds={r.melds[s]} seat={s} n={r.melds.length} />
             ) : s === me && live ? (
               <button className="show-hand" onClick={() => send({ t: 'showHand' })}>{t('展示我的手牌')}</button>
             ) : (
@@ -1188,7 +1188,7 @@ function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = 
       {spectating ? null : game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
       {room.players.map((p) => {
         const pos = positionOf(p.seat, me, n);
-        return <Side key={p.seat} p={p} game={game} pos={pos} pointKind={pointKind} showHand={spectating || pos !== 'bottom'} />;
+        return <Side key={p.seat} p={p} n={n} game={game} pos={pos} pointKind={pointKind} showHand={spectating || pos !== 'bottom'} />;
       })}
       {room.players.map((p) => (
         <NamePlate key={p.seat} p={p} room={room} game={game} pos={positionOf(p.seat, me, n)} />

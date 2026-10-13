@@ -114,6 +114,7 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 功能 | 主要位置 |
 | --- | --- |
 | 打牌、鳴牌按鈕（含固定位置的「打出」） | Table.tsx `CallOverlay`、`useMyArea` |
+| 鳴牌排列（轉橫的牌朝向來源座位） | rules.ts `meldTileOrder`、Table.tsx `MeldView` |
 | 聽牌／打出前提示每張聽牌的牌型與分數 | Table.tsx `Waits`/`DiscardWaits`/`WaitList`（`waitRows` 自摸、銃和分開算） |
 | 自摸／和按鈕上的分數與牌型 | hand.ts `winScoreView`（`AvailableActions.winScore`）、Table.tsx `winLabel` |
 | 推薦牌型（普通型／進階型切換、鳴牌時比較鳴與不鳴） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`、recommend.ts、outcome.ts |
