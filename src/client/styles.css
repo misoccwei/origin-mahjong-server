@@ -310,6 +310,13 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 /* 橫式：鳴牌放在右側欄下方，用較大的牌 */
 .side-melds { margin-top: auto; display: grid; gap: 4px; justify-items: start; }
 .side-melds .meld-area { --tw: clamp(22px, calc(var(--S) * 0.05), 44px); justify-content: flex-start; }
+.discard-waits { display: grid; gap: 4px; width: 100%; }
+.discard-waits > div { display: flex; align-items: center; gap: 4px; }
+.discard-waits ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.discard-waits li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.discard-waits li.none { opacity: 0.55; }
+.discard-waits .wait-score { margin-left: 0; }
+.discard-waits .yaku-names { font-size: 0.9em; color: #dfe9e3; }
 .wait-score { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.3); color: var(--gold); font-weight: 700; white-space: nowrap; }
 .tile-slot { position: relative; display: inline-flex; }
 /* 外框固定不動，往上多留一點點擊範圍（選中的牌浮起來後仍點得到） */

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import type { GameView, HandResultView, PlayerView, RoomView } from '../../shared/protocol.js';
-import type { HandScore } from '../../shared/scoring.js';
+import { scoreByWait, type HandScore } from '../../shared/scoring.js';
 import { fastestWin, recommendYaku } from '../../shared/recommend.js';
 import { OUTCOME_MAX_SHANTEN, outcomeRecommend } from '../../shared/outcome.js';
 import { baseScoreFor, type Meld } from '../../shared/rules.js';
@@ -174,6 +174,50 @@ function Waits({ waits, score }: { waits: GameView['myWaits']; score: GameView['
   );
 }
 
+/**
+ * 點選（或指著）手牌時：打出這張後聽的每一張牌各自能和成什麼（牌型與和牌分數，自摸或銃和取高、不含偶然類），
+ * 例如聽四、七筒，但只有四筒有一氣通貫，就分開列出。剩餘張數只扣自己看得到的牌。
+ */
+function DiscardWaits({ room, game, discard, waits }: { room: RoomView; game: GameView; discard: TileKind; waits: TileKind[] }) {
+  const me = room.players[room.mySeat!];
+  const rows = useMemo(() => {
+    const concealed = game.myHand.map(kindOf);
+    concealed.splice(concealed.indexOf(discard), 1);
+    const scores = scoreByWait(concealed, me.melds, me.wind ?? 27, room.settings.advanced, baseScoreFor(room.settings, me.seat), room.settings.expansion);
+    const { visible } = recommendInput(room, game);
+    return waits.map((k) => ({ kind: k, left: Math.max(0, 4 - visible[k]), score: scores.find((s) => s.tile === k)?.score ?? null }));
+  }, [game.myHand, discard, waits, me.melds, me.wind, room.settings, room.players]);
+  const min = room.settings.minWinScore;
+  return (
+    <div className="discard-waits">
+      <div>
+        打出 <Tile kind={discard} small /> 後聽：
+      </div>
+      <ul>
+        {rows.map((r) => (
+          <li key={r.kind} className={r.left === 0 || !r.score || r.score.total < min ? 'none' : ''}>
+            <span className="wait">
+              <Tile kind={r.kind} small />
+              <span className="left">×{r.left}</span>
+            </span>
+            {r.score ? (
+              <>
+                <span className="wait-score">{r.score.total} 分</span>
+                <span className="yaku-names">
+                  {r.score.yaku.map((y) => (y.count > 1 ? `${y.name}×${y.count}` : y.name)).join('・')}
+                  {r.score.total < min && '（未達和牌最低分數，不能和）'}
+                </span>
+              </>
+            ) : (
+              <span className="yaku-names">不能和</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** 牌型表（預設只列出這桌適用的牌型） */
 function YakuModal({ room, onClose }: { room: RoomView; onClose: () => void }) {
   return (
@@ -325,13 +369,8 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   const top = (
     <div className="my-top">
       <div className="hint-line">
-        {shownHint ? (
-          <>
-            打出後聽：
-            {shownHint.map((k) => (
-              <Tile key={k} kind={k} small />
-            ))}
-          </>
+        {shownHint && pointKind !== null ? (
+          <DiscardWaits room={room} game={game} discard={pointKind} waits={shownHint} />
         ) : game.phase === 'passReveal' ? (
           game.passReceived ? '收到換來的 3 張牌，倒數結束後放進手牌' : '這次沒有換到牌'
         ) : game.myWaits.length > 0 ? (

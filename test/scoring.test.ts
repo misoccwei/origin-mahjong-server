@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateWin, bestTenpaiScore, waitingKinds } from '../src/shared/scoring.js';
+import { evaluateWin, bestTenpaiScore, scoreByWait, waitingKinds } from '../src/shared/scoring.js';
 import { settle } from '../src/shared/settlement.js';
 import { baseScoreFor, defaultSettings, sanitizeSettings, type Meld } from '../src/shared/rules.js';
 import { WEST, EAST } from '../src/shared/tiles.js';
@@ -383,3 +383,17 @@ describe('底分與和牌最低分數設定', () => {
     expect(sanitizeSettings({ minWinScore: 999 }, d).minWinScore).toBe(20);
   });
 });
+
+describe('每張聽的牌各自的和牌', () => {
+  it('聽四、七筒：只有四筒有一氣通貫，分開計算', () => {
+    // 123p 56p 789p 東東東 白白
+    const r = scoreByWait(uni('🀙🀚🀛🀝🀞🀟🀠🀡🀀🀀🀀🀆🀆'), [], uni('🀀')[0], true, 0);
+    expect(r.map((x) => x.tile)).toEqual(uni('🀜🀟'));
+    const names = (t: string) => r.find((x) => x.tile === uni(t)[0])!.score.yaku.map((y) => y.name);
+    expect(names('🀜')).toContain('一氣通貫');
+    expect(names('🀟')).not.toContain('一氣通貫');
+    expect(names('🀟')).toContain('混一色');
+    expect(r[0].score.total).toBeGreaterThan(r[1].score.total);
+  });
+});
+
