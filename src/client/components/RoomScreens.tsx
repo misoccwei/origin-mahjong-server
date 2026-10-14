@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { RoomView } from '../../shared/protocol.js';
 import type { RuleSettings } from '../../shared/rules.js';
-import { send, toast } from '../net.js';
+import { request, send, toast } from '../net.js';
+import { ReqButton } from './Busy.js';
 import { aiLevelLabel, AILevelSelect } from './Inputs.js';
 import { LangSelect, SettingsForm } from './Lobby.js';
 import { playerName, t, tn } from '../i18n/index.js';
@@ -78,9 +79,9 @@ export function WaitingRoom({ room }: { room: RoomView }) {
                   </span>
                   {p.seat !== room.hostSeat && <span className={p.ready ? 'ready yes' : 'ready'}>{p.ready ? t('已準備') : t('未準備')}</span>}
                   {isHost && p.seat !== me && (
-                    <button className="link" onClick={() => send({ t: 'removeSeat', seat: p.seat })}>
+                    <ReqButton className="link" run={() => request({ t: 'removeSeat', seat: p.seat })}>
                       {t('移除')}
-                    </button>
+                    </ReqButton>
                   )}
                 </>
               ) : (
@@ -92,30 +93,30 @@ export function WaitingRoom({ room }: { room: RoomView }) {
         {/* 固定兩欄的格子：某顆按鈕停用時位置不變，其他按鈕不會跟著移動 */}
         {spectating ? (
           <div className="room-actions">
-            <button className="primary" disabled={full} onClick={() => send({ t: 'joinRoom', roomId: room.id })} title={full ? t('座位已滿') : undefined}>
+            <ReqButton className="primary" disabled={full} run={() => request({ t: 'joinRoom', roomId: room.id })} title={full ? t('座位已滿') : undefined}>
               {t('入座')}
-            </button>
-            <button onClick={() => send({ t: 'leaveRoom' })}>{t('離開觀戰')}</button>
+            </ReqButton>
+            <ReqButton run={() => request({ t: 'leaveRoom' })}>{t('離開觀戰')}</ReqButton>
           </div>
         ) : (
           <div className="room-actions">
-            <button disabled={!isHost || full} onClick={() => send({ t: 'addAI' })} title={full ? t('座位已滿') : undefined}>
+            <ReqButton disabled={!isHost || full} run={() => request({ t: 'addAI' })} title={full ? t('座位已滿') : undefined}>
               {t('加入 AI')}
-            </button>
+            </ReqButton>
             <label className="inline-field">
               {t('電腦')}
               <AILevelSelect value={room.settings.aiLevel} disabled={!isHost} onChange={(level) => send({ t: 'setAILevel', level })} />
             </label>
             {isHost ? (
-              <button className="primary" disabled={!full || !othersReady} onClick={() => send({ t: 'start' })}>
+              <ReqButton className="primary" disabled={!full || !othersReady} run={() => request({ t: 'start' })}>
                 {t('開始')}
-              </button>
+              </ReqButton>
             ) : (
-              <button className={myReady ? '' : 'primary'} onClick={() => send({ t: 'ready', ready: !myReady })}>
+              <ReqButton className={myReady ? '' : 'primary'} run={() => request({ t: 'ready', ready: !myReady })}>
                 {myReady ? t('取消準備') : t('準備')}
-              </button>
+              </ReqButton>
             )}
-            <button onClick={() => send({ t: 'leaveRoom' })}>{t('離開房間')}</button>
+            <ReqButton run={() => request({ t: 'leaveRoom' })}>{t('離開房間')}</ReqButton>
           </div>
         )}
         <SpectatorList room={room} />
@@ -130,9 +131,9 @@ export function WaitingRoom({ room }: { room: RoomView }) {
         </h2>
         <SettingsForm value={draft} onChange={setDraft} disabled={!isHost} seatNames={room.players.map((p) => (p.nickname ? playerName(p) : null))} showAILevel={false} />
         {isHost && (
-          <button className="primary" disabled={JSON.stringify(draft) === JSON.stringify(room.settings)} onClick={() => send({ t: 'updateSettings', settings: draft })}>
+          <ReqButton className="primary" disabled={JSON.stringify(draft) === JSON.stringify(room.settings)} run={() => request({ t: 'updateSettings', settings: draft })}>
             {t('套用設定')}
-          </button>
+          </ReqButton>
         )}
       </div>
     </div>
@@ -159,11 +160,11 @@ export function FinalScreen({ room }: { room: RoomView }) {
         </ol>
         <VoicePanel room={room} />
         <div className="row">
-          {isHost && !room.dissolved && <button className="primary" onClick={() => send({ t: 'extend' })}>{t('加一圈')}</button>}
-          {isHost && hasLeft && <button onClick={() => send({ t: 'addAI' })}>{t('以 AI 補上空位')}</button>}
-          {isHost && <button onClick={() => send({ t: 'restart' })}>{t('回到房間重新開始')}</button>}
+          {isHost && !room.dissolved && <ReqButton className="primary" run={() => request({ t: 'extend' })}>{t('加一圈')}</ReqButton>}
+          {isHost && hasLeft && <ReqButton run={() => request({ t: 'addAI' })}>{t('以 AI 補上空位')}</ReqButton>}
+          {isHost && <ReqButton run={() => request({ t: 'restart' })}>{t('回到房間重新開始')}</ReqButton>}
           <ExportButton render={() => renderFinal(room)} filename={`mahjong-${room.id}-final.png`} />
-          <button onClick={() => send({ t: 'leaveRoom' })}>{me === null ? t('離開觀戰') : t('離開房間')}</button>
+          <ReqButton run={() => request({ t: 'leaveRoom' })}>{me === null ? t('離開觀戰') : t('離開房間')}</ReqButton>
         </div>
         <SpectatorList room={room} />
       </div>

@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, normalize, resolve } from 'node:path';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
-import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '../shared/protocol.js';
+import { PROTOCOL_VERSION, type ClientMessage, type ClientRequest, type ServerMessage } from '../shared/protocol.js';
 import { sanitizeSettings } from '../shared/rules.js';
 import { newNonce, verifyAuth } from './identity.js';
 import type { Rng } from './engine/hand.js';
@@ -288,7 +288,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     let queue = Promise.resolve();
     ws.on('pong', () => (c.alive = true));
     ws.on('message', (data) => {
-      let msg: ClientMessage;
+      let msg: ClientRequest;
       try {
         msg = JSON.parse(String(data));
       } catch {
@@ -296,7 +296,12 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
       // 依序處理同一連線的訊息
-      queue = queue.then(() => handle(c, msg)).catch((e) => log(`handler error: ${e?.stack ?? e}`));
+      queue = queue
+        .then(() => handle(c, msg))
+        .catch((e) => log(`handler error: ${e?.stack ?? e}`))
+        .then(() => {
+          if (typeof msg.rid === 'number') send(ws, { t: 'done', rid: msg.rid });
+        });
     });
     ws.on('close', () => {
       clearTimeout(authTimer);

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { PROTOCOL_VERSION, type ClientMessage, type RtcSignal, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
+import { PROTOCOL_VERSION, type ClientMessage, type ClientRequest, type RtcSignal, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
 import { signChallenge } from './identity.js';
 import { t } from './i18n/index.js';
 
@@ -16,6 +16,8 @@ export interface AppState {
   fatal: string | null;
   /** 大廳：等待中的房間列表 */
   roomList: RoomSummary[];
+  /** 已送出、還在等伺服器回覆的請求（訊息種類） */
+  pending: ClientMessage['t'][];
 }
 
 let state: AppState = {
@@ -29,6 +31,7 @@ let state: AppState = {
   toast: null,
   fatal: null,
   roomList: [],
+  pending: [],
 };
 const listeners = new Set<() => void>();
 
@@ -104,6 +107,9 @@ export function connect() {
       case 'roomList':
         set({ roomList: msg.rooms });
         break;
+      case 'done':
+        finish(msg.rid);
+        break;
       case 'kicked':
         stopped = true;
         set({ fatal: msg.reason });
@@ -111,6 +117,8 @@ export function connect() {
     }
   };
   ws.onclose = () => {
+    // 斷線時等待中的請求不會再有回覆
+    [...waiting.keys()].forEach(finish);
     set({ conn: 'closed', authed: false });
     if (stopped) return;
     const delay = Math.min(10_000, 500 * 2 ** retry++);
@@ -122,7 +130,37 @@ export function send(msg: ClientMessage) {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
-export function act(action: GameAction) {
-  if (!state.game) return;
-  send({ t: 'action', handNo: state.game.handNo, action });
+// ---- 等待回覆的請求 ----
+
+/** 伺服器一直沒回覆時（不應發生）最多等這麼久就放開按鈕 */
+const REQUEST_TIMEOUT_MS = 15_000;
+let nextRid = 0;
+const waiting = new Map<number, { t: ClientMessage['t']; resolve: () => void; timer: ReturnType<typeof setTimeout> }>();
+
+function finish(rid: number) {
+  const w = waiting.get(rid);
+  if (!w) return;
+  clearTimeout(w.timer);
+  waiting.delete(rid);
+  set({ pending: [...waiting.values()].map((x) => x.t) });
+  w.resolve();
+}
+
+/** 送出需要等伺服器處理的請求；伺服器處理完（含錯誤訊息與狀態推送）時 resolve */
+export function request(msg: ClientMessage): Promise<void> {
+  if (ws?.readyState !== WebSocket.OPEN) {
+    toast(t('連線中斷，請稍候再試'));
+    return Promise.resolve();
+  }
+  const rid = ++nextRid;
+  ws.send(JSON.stringify({ ...msg, rid } satisfies ClientRequest));
+  return new Promise((resolve) => {
+    waiting.set(rid, { t: msg.t, resolve, timer: setTimeout(() => finish(rid), REQUEST_TIMEOUT_MS) });
+    set({ pending: [...waiting.values()].map((x) => x.t) });
+  });
+}
+
+export function act(action: GameAction): Promise<void> {
+  if (!state.game) return Promise.resolve();
+  return request({ t: 'action', handNo: state.game.handNo, action });
 }

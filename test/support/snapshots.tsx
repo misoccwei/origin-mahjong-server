@@ -88,5 +88,5 @@ export function render(r: RoomView, g: GameView | null) {
 }
 
 export function appState(patch: Partial<AppState> = {}): AppState {
-  return { conn: 'open', authed: true, userId: 'me', nickname: '我', room: null, game: null, clockOffset: 0, toast: null, fatal: null, roomList: [], ...patch };
+  return { conn: 'open', authed: true, userId: 'me', nickname: '我', room: null, game: null, clockOffset: 0, toast: null, fatal: null, roomList: [], pending: [], ...patch };
 }

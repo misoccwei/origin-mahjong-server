@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { AILevelSelect, NumInput } from './Inputs.js';
 import { YakuTable } from './YakuTable.js';
 import { DEFAULT_ROUNDS, defaultSettings, type RuleSettings } from '../../shared/rules.js';
-import { send, type AppState } from '../net.js';
+import { BusyVeil, ReqButton, useRequest } from './Busy.js';
+import { request, send, type AppState } from '../net.js';
 import { LANGS, setLang, t, useLang, type Lang } from '../i18n/index.js';
 
 /** 語言切換（記在瀏覽器） */
@@ -24,6 +25,7 @@ export function LangSelect() {
 
 export function NicknameScreen({ state }: { state: AppState }) {
   const [name, setName] = useState(state.nickname ?? '');
+  const { busy, run } = useRequest();
   return (
     <div className="panel narrow">
       <h1>{t('原點麻將')}</h1>
@@ -31,12 +33,13 @@ export function NicknameScreen({ state }: { state: AppState }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          send({ t: 'setNickname', name });
+          void run(() => request({ t: 'setNickname', name }));
         }}
       >
         <input autoFocus maxLength={16} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('暱稱')} />
-        <button type="submit" disabled={!name.trim()}>
+        <button type="submit" disabled={!name.trim()} className={busy ? 'busy' : undefined} aria-busy={busy || undefined}>
           {t('確定')}
+          {busy && <BusyVeil />}
         </button>
       </form>
       <p className="muted small">{t('使用者代碼：{id}', { id: state.userId?.slice(0, 8) ?? '' })}</p>
@@ -193,11 +196,11 @@ function RoomList({ state }: { state: AppState }) {
               </div>
               <div className="room-btns">
                 {r.joinable && (
-                  <button className="primary" onClick={() => send({ t: 'joinRoom', roomId: r.id })}>
+                  <ReqButton className="primary" run={() => request({ t: 'joinRoom', roomId: r.id })}>
                     {t('加入')}
-                  </button>
+                  </ReqButton>
                 )}
-                {r.spectatable && <button onClick={() => send({ t: 'spectate', roomId: r.id })}>{t('觀戰')}</button>}
+                {r.spectatable && <ReqButton run={() => request({ t: 'spectate', roomId: r.id })}>{t('觀戰')}</ReqButton>}
               </div>
             </li>
           ))}
@@ -210,6 +213,7 @@ function RoomList({ state }: { state: AppState }) {
 export function LobbyScreen({ state }: { state: AppState }) {
   const [settings, setSettings] = useState<RuleSettings>(defaultSettings(4));
   const [code, setCode] = useState('');
+  const join = useRequest();
   return (
     <div className="lobby">
       <div className="panel">
@@ -217,25 +221,26 @@ export function LobbyScreen({ state }: { state: AppState }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            send({ t: 'joinRoom', roomId: code.trim() });
+            void join.run(() => request({ t: 'joinRoom', roomId: code.trim() }));
           }}
         >
           <input inputMode="numeric" maxLength={4} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder={t('4 位數房號')} />
-          <button type="submit" className="primary" disabled={code.length !== 4}>
+          <button type="submit" className={join.busy ? 'primary busy' : 'primary'} aria-busy={join.busy || undefined} disabled={code.length !== 4}>
             {t('加入')}
+            {join.busy && <BusyVeil />}
           </button>
-          <button type="button" disabled={code.length !== 4} onClick={() => send({ t: 'spectate', roomId: code.trim() })}>
+          <ReqButton type="button" disabled={code.length !== 4} run={() => request({ t: 'spectate', roomId: code.trim() })}>
             {t('觀戰')}
-          </button>
+          </ReqButton>
         </form>
         <RoomList state={state} />
       </div>
       <div className="panel">
         <h2>{t('建立房間')}</h2>
         <SettingsForm value={settings} onChange={setSettings} />
-        <button className="primary" onClick={() => send({ t: 'createRoom', settings })}>
+        <ReqButton className="primary" run={() => request({ t: 'createRoom', settings })}>
           {t('建立房間')}
-        </button>
+        </ReqButton>
       </div>
       <div className="panel wide">
         <h2>{t('牌型表')}</h2>
@@ -243,9 +248,15 @@ export function LobbyScreen({ state }: { state: AppState }) {
       </div>
       <p className="muted small">
         {state.nickname}（{state.userId?.slice(0, 8)}）
-        <button className="link" onClick={() => send({ t: 'setNickname', name: prompt(t('新的暱稱'), state.nickname ?? '') ?? state.nickname ?? '' })}>
+        <ReqButton
+          className="link"
+          run={() => {
+            const name = prompt(t('新的暱稱'), state.nickname ?? '');
+            return name && name !== state.nickname ? request({ t: 'setNickname', name }) : undefined;
+          }}
+        >
           {t('修改暱稱')}
-        </button>
+        </ReqButton>
         <LangSelect />
       </p>
     </div>

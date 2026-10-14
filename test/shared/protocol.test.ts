@@ -7,7 +7,7 @@ import { PROTOCOL_VERSION } from '../../src/shared/protocol.js';
 // 而版本號正是連線時用來偵測這種情況的依據。
 // protocol.ts 的程式（不含註解、空白與版本號本身）有變動時這個測試會失敗：
 // 請把 PROTOCOL_VERSION 加一，再把下面兩個值更新成錯誤訊息裡的新值。只改註解不需要加版本。
-const RECORDED = { version: 14, hash: '5a926cdfb7762a52' };
+const RECORDED = { version: 15, hash: '3885431443eaabd4' };
 
 describe('協定版本', () => {
   it('protocol.ts 變動時必須同時調整 PROTOCOL_VERSION', () => {

@@ -47,7 +47,7 @@ src/server/
   server.ts        HTTP 靜態檔 + /ws；把訊息分派給 Room；錯誤訊息是固定中文字串
   users.ts / identity.ts  暱稱、公鑰簽章登入
 src/client/
-  net.ts           連線與全域狀態（useAppState）、toast
+  net.ts           連線與全域狀態（useAppState）、toast、request（等伺服器回覆）
   i18n/            多國語言（index.ts：t/tn/setLang/useLang/tileLabel/windShort/playerName；en.ts、ja.ts 字典）
   components/Table.tsx      牌桌（直式／橫式兩種版面）、操作按鈕、提示、推薦牌型面板、局結果（ResultBody 可重用）
   components/RoomScreens.tsx 等待房間、最終結算（含重看各局 ReplayModal）、各局紀錄
@@ -60,7 +60,7 @@ src/client/
 
 ## 必須遵守的慣例與陷阱
 
-- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**14**。
+- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**15**。
 - **新增規則設定**：`rules.ts` 的 `RuleSettings`＋`defaultSettings`＋`sanitizeSettings`（範圍檢查）→ `Lobby.tsx` 的 `SettingsForm` → 需要時 `RoomScreens.tsx` 的 `rulesSummary` → `test/shared/rules.test.ts` → 翻譯 → README → 協定版本加一。
 - **多國語言（最常踩的坑）**：
   - 所有看得到的字都要包 `t('繁中原文')`；含元件（例如牌）的用 `tn('打出 {tile}', { tile: <Tile …/> })`；變數用 `{name}`，不要用字串串接拼句子（語序不同）。
@@ -80,6 +80,7 @@ src/client/
   同一牌型的不同做法要分開成多個目標（id 相同），不要合併。改模型時用模擬比對預測與實際和牌率（單人模擬時記得吃碰要關掉：`players: 1`）。
 - **進階型的效能**：`outcome.ts` 最壞約 0.5 秒（2 向聽、手上 14 張）。為了做牌而鳴（向聽數不變）只在一向聽以內展開、改聽只在目前已聽牌時展開，放寬會讓局面數暴增；前端在 `useEffect` 裡算，不要改回 `useMemo`。
 - **效能**：AI（normal/hard）每一步都呼叫 `recommendYaku`；評估函式會被呼叫上千次，避免在裡面配置陣列或產生字串。`shantenStandard` 以 5 進位整數為快取 key。改了之後看 `simulation.test.ts` 的「4人困難 AI」時間（約 10 秒，明顯變慢要處理）。
+- **等伺服器回覆的按鈕**：用 `Busy.tsx` 的 `ReqButton`（`run` 回傳 `request()`／`act()` 的 Promise）或 `useRequest`；`request()` 會帶 `rid`，伺服器處理完回 `done`。等待中按鈕轉圈圈、其他請求按鈕點了沒作用。定時自動送的訊息（`listRooms`、語音 `rtc`）用 `send()`，不要用 `request()`（否則會一直擋住按鈕）。
 - **計時與測試**：`RoomDeps.resultMs` 只給測試用來縮短結算倒數；正式由 `settings.resultSeconds` 決定（0 = 等所有人按下一局）。
 - **隨機座位預設開啟**：WebSocket 測試客戶端建立房間時預設送 `randomSeats: false`（`test/support/wsClient.ts`），測試要固定座位才不會亂。
 - **自動功能**：自動摸打、自動和牌只維持一局（`advanceHand` 會關掉）；不鳴牌（`noCall`）持續有效。自動和只在和牌分數達到這副聽牌的最高分（`winPreview().best`）時才自動，否則 `autoAction` 回傳 null 交給玩家；沒有時限的測試要用 `answerAutoStop` 替玩家回答。
@@ -128,4 +129,5 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 四角名牌（門風、分數）、中央餘牌與打出的牌、局數與倒數（直式最上面、橫式右上） | Table.tsx `NamePlate`/`Center`/`TopBar`、styles.css `.table.landscape` |
 | 多國語言 | src/client/i18n/、`LangSelect` |
 | 語音 | voice.ts、components/Voice.tsx、server.ts `rtc` 轉送 |
+| 等待伺服器回覆（轉圈圈、防連點） | net.ts `request`、components/Busy.tsx、server.ts `done` |
 | 斷線暫停、AI 代打 | room.ts `updatePause`/`decide` |

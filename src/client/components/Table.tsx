@@ -5,7 +5,8 @@ import { fastestWin, recommendYaku } from '../../shared/recommend.js';
 import { OUTCOME_MAX_SHANTEN, outcomeRecommend, type OutcomeGroup, type OutcomePlan, type OutcomeResult } from '../../shared/outcome.js';
 import { baseScoreFor, meldTileOrder, type Meld } from '../../shared/rules.js';
 import { kindOf, type TileId, type TileKind } from '../../shared/tiles.js';
-import { act, send, type AppState } from '../net.js';
+import { act, request, send, type AppState } from '../net.js';
+import { BusyVeil, ReqButton, useRequest } from './Busy.js';
 import { AILevelSelect } from './Inputs.js';
 import { Tile } from './Tile.js';
 import { LangSelect } from './Lobby.js';
@@ -126,21 +127,21 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
   const buttons: ReactElement[] = [];
   if (p.kind === 'turn') {
     if (discardButton) buttons.push(discardButton);
-    if (p.tsumo) buttons.push(<button key="tsumo" className="call win" onClick={() => act({ type: 'tsumo' })}>{winLabel(t('自摸'), p.winScore)}</button>);
-    for (const k of p.ankan ?? []) buttons.push(<button key={'an' + k} className="call kan" onClick={() => act({ type: 'ankan', kind: k })}>{tn('暗槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
-    for (const k of p.kakan ?? []) buttons.push(<button key={'ka' + k} className="call kan" onClick={() => act({ type: 'kakan', kind: k })}>{tn('加槓 {tile}', { tile: <Tile kind={k} small /> })}</button>);
+    if (p.tsumo) buttons.push(<ReqButton key="tsumo" className="call win" run={() => act({ type: 'tsumo' })}>{winLabel(t('自摸'), p.winScore)}</ReqButton>);
+    for (const k of p.ankan ?? []) buttons.push(<ReqButton key={'an' + k} className="call kan" run={() => act({ type: 'ankan', kind: k })}>{tn('暗槓 {tile}', { tile: <Tile kind={k} small /> })}</ReqButton>);
+    for (const k of p.kakan ?? []) buttons.push(<ReqButton key={'ka' + k} className="call kan" run={() => act({ type: 'kakan', kind: k })}>{tn('加槓 {tile}', { tile: <Tile kind={k} small /> })}</ReqButton>);
     // 自動摸打遇到能槓時會停下來問：不槓就照常摸切
     if (game.auto.on && buttons.length && game.myDrawn !== null) {
-      buttons.push(<button key="nokan" className="call skip" onClick={() => act({ type: 'discard', tile: game.myDrawn! })}>{t('不槓（摸切）')}</button>);
+      buttons.push(<ReqButton key="nokan" className="call skip" run={() => act({ type: 'discard', tile: game.myDrawn! })}>{t('不槓（摸切）')}</ReqButton>);
     }
   } else {
-    if (p.ron) buttons.push(<button key="ron" className="call win" onClick={() => act({ type: 'ron' })}>{winLabel(p.kind === 'chankan' ? t('搶槓') : t('和'), p.winScore)}</button>);
+    if (p.ron) buttons.push(<ReqButton key="ron" className="call win" run={() => act({ type: 'ron' })}>{winLabel(p.kind === 'chankan' ? t('搶槓') : t('和'), p.winScore)}</ReqButton>);
     // 不鳴牌：只剩和與略過
-    if (!game.auto.noCall && p.minkan) buttons.push(<button key="kan" className="call kan" onClick={() => act({ type: 'minkan' })}>{t('槓')}</button>);
-    if (!game.auto.noCall && p.pon) buttons.push(<button key="pon" className="call pon" onClick={() => act({ type: 'pon' })}>{t('碰')}</button>);
+    if (!game.auto.noCall && p.minkan) buttons.push(<ReqButton key="kan" className="call kan" run={() => act({ type: 'minkan' })}>{t('槓')}</ReqButton>);
+    if (!game.auto.noCall && p.pon) buttons.push(<ReqButton key="pon" className="call pon" run={() => act({ type: 'pon' })}>{t('碰')}</ReqButton>);
     for (const c of game.auto.noCall ? [] : p.chi ?? []) {
       buttons.push(
-        <button key={'chi' + c.join()} className="call chi" onClick={() => act({ type: 'chi', tiles: c })}>
+        <ReqButton key={'chi' + c.join()} className="call chi" run={() => act({ type: 'chi', tiles: c })}>
           {tn('吃 {tiles}', {
             tiles: (
               <>
@@ -149,10 +150,10 @@ function CallOverlay({ game, discardButton }: { game: GameView; discardButton?: 
               </>
             ),
           })}
-        </button>,
+        </ReqButton>,
       );
     }
-    buttons.push(<button key="pass" className="call skip" onClick={() => act({ type: 'pass' })}>{t('略過')}</button>);
+    buttons.push(<ReqButton key="pass" className="call skip" run={() => act({ type: 'pass' })}>{t('略過')}</ReqButton>);
   }
   if (!buttons.length) return null;
   return <div className="call-overlay">{buttons}</div>;
@@ -344,9 +345,9 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
               {fs ? t('離開全螢幕') : t('全螢幕')}
             </button>
           )}
-          <button className="danger" onClick={() => confirm(t('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？')) && send({ t: 'leaveRoom' })}>
+          <ReqButton className="danger" run={() => confirm(t('牌局進行中離開，牌局會暫停並由房主決定是否交給 AI。確定離開？')) && request({ t: 'leaveRoom' })}>
             {t('離開牌局')}
-          </button>
+          </ReqButton>
         </div>
       )}
       {showVoice && (
@@ -390,9 +391,16 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   const pointKind = hover ?? (!passing && selected.length === 1 ? kindOf(selected[0]) : null);
   useEffect(() => onPoint(pointKind), [pointKind, onPoint]);
   const shownHint = pointKind !== null ? hints[pointKind] : undefined;
+  // 打牌送出後等伺服器回覆：「打出」按鈕轉圈圈，期間點牌沒有作用
+  const discarding = useRequest();
+  const discard = (tile: TileId) =>
+    void discarding.run(async () => {
+      await act({ type: 'discard', tile });
+      setSelected([]);
+    });
 
   const onTile = (t: TileId) => {
-    if (!p) return;
+    if (!p || discarding.busy) return;
     if (passing) {
       // 候選格滿了再點別張：最早選的那張回到手牌
       setSelected((cur) => [...cur, t].slice(-3));
@@ -400,13 +408,11 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       return;
     }
     if (p.kind !== 'turn') return;
-    if (selected[0] === t) {
-      act({ type: 'discard', tile: t });
-      setSelected([]);
-    } else setSelected([t]);
+    if (selected[0] === t) discard(t);
+    else setSelected([t]);
   };
   const clickable = !!p && (p.kind === 'turn' || passing);
-  const setAuto = (patch: Partial<GameView['auto']>) => send({ t: 'setAuto', ...game.auto, ...patch });
+  const setAuto = (patch: Partial<GameView['auto']>) => request({ t: 'setAuto', ...game.auto, ...patch });
   // 點擊與滑鼠事件放在不會移動的外框上：牌浮起來時不會從游標下滑走而抖動、點不到
   const tileSlot = (t: TileId) => (
     <span
@@ -439,9 +445,9 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         )}
       </div>
       {game.thinkAvailable && (
-        <button className="chip-btn think" onClick={() => send({ t: 'think' })} title={t('這一局只能用一次')}>
+        <ReqButton className="chip-btn think" run={() => request({ t: 'think' })} title={t('這一局只能用一次')}>
           {t('長考 +60 秒')}
-        </button>
+        </ReqButton>
       )}
     </div>
   );
@@ -476,15 +482,15 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         </svg>
         {t('推薦')}
       </button>
-      <button className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} onClick={() => setAuto({ win: !game.auto.win })}>
+      <ReqButton className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} run={() => setAuto({ win: !game.auto.win })}>
         {t('自動和')}
-      </button>
-      <button className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，下一局自動關閉')} onClick={() => setAuto({ on: !game.auto.on })}>
+      </ReqButton>
+      <ReqButton className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，下一局自動關閉')} run={() => setAuto({ on: !game.auto.on })}>
         {t('自動打')}
-      </button>
-      <button className={`chip-btn ${game.auto.noCall ? 'on' : ''}`} aria-pressed={game.auto.noCall} title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')} onClick={() => setAuto({ noCall: !game.auto.noCall })}>
+      </ReqButton>
+      <ReqButton className={`chip-btn ${game.auto.noCall ? 'on' : ''}`} aria-pressed={game.auto.noCall} title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')} run={() => setAuto({ noCall: !game.auto.noCall })}>
         {t('不鳴牌')}
-      </button>
+      </ReqButton>
       <VoiceButtons />
     </div>
   );
@@ -505,12 +511,12 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         )}
       </div>
       <div className="pass-actions">
-        <button className="call pon" disabled={selected.length !== 3} onClick={() => (act({ type: 'passThree', tiles: selected }), setSelected([]))}>
+        <ReqButton className="call pon" disabled={selected.length !== 3} run={async () => (await act({ type: 'passThree', tiles: selected }), setSelected([]))}>
           {t('換出')}
-        </button>
-        <button className="call skip" onClick={() => (act({ type: 'passThree', tiles: null }), setSelected([]))}>
+        </ReqButton>
+        <ReqButton className="call skip" run={async () => (await act({ type: 'passThree', tiles: null }), setSelected([]))}>
           {t('不換')}
-        </button>
+        </ReqButton>
       </div>
     </div>
   ) : null;
@@ -519,8 +525,9 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
   const toDiscard = p?.kind === 'turn' && selected.length === 1 && game.myHand.includes(selected[0]) ? selected[0] : null;
   const discardButton =
     toDiscard !== null ? (
-      <button key="discard" className="call discard" onClick={() => (act({ type: 'discard', tile: toDiscard }), setSelected([]))}>
+      <button key="discard" className={`call discard ${discarding.busy ? 'busy' : ''}`} aria-busy={discarding.busy || undefined} onClick={() => discard(toDiscard)}>
         {tn('打出 {tile}', { tile: <Tile tile={toDiscard} small /> })}
+        {discarding.busy && <BusyVeil />}
       </button>
     ) : null;
 
@@ -961,7 +968,7 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
             {visible ? (
               <HandRow hand={r.hands[s]} melds={r.melds[s]} seat={s} n={r.melds.length} />
             ) : s === me && live ? (
-              <button className="show-hand" onClick={() => send({ t: 'showHand' })}>{t('展示我的手牌')}</button>
+              <ReqButton className="show-hand" run={() => request({ t: 'showHand' })}>{t('展示我的手牌')}</ReqButton>
             ) : (
               <div className="small muted">{t('手牌未公開')}</div>
             )}
@@ -1005,10 +1012,10 @@ function ResultModal({ room, game, now }: { room: RoomView; game: GameView; now:
               {remain !== null ? `（${remain}）` : ''}
             </p>
           ) : (
-            <button className="primary" disabled={acked} onClick={() => send({ t: 'nextHand' })}>
+            <ReqButton className="primary" disabled={acked} run={() => request({ t: 'nextHand' })}>
               {acked ? t('等待其他玩家…') : game.handNo >= game.totalHands ? t('查看結算') : t('下一局')}
               {remain !== null ? `（${remain}）` : ''}
-            </button>
+            </ReqButton>
           )}
           <ExportButton
             render={() => renderHandResult(room, { handNo: game.handNo, totalHands: game.totalHands, result: r, totals })}
@@ -1033,10 +1040,10 @@ function PauseOverlay({ room }: { room: RoomView }) {
           <>
             <p>{t('請決定要等待玩家回來、交給 AI 代打，或解散牌局。')}</p>
             <div className="row">
-              <button className="primary" onClick={() => send({ t: 'decide', choice: 'ai' })}>
+              <ReqButton className="primary" run={() => request({ t: 'decide', choice: 'ai' })}>
                 {t('交給 AI 代打')}
-              </button>
-              <button onClick={() => send({ t: 'decide', choice: 'dissolve' })}>{t('解散牌局')}</button>
+              </ReqButton>
+              <ReqButton run={() => request({ t: 'decide', choice: 'dissolve' })}>{t('解散牌局')}</ReqButton>
             </div>
           </>
         ) : (
@@ -1044,9 +1051,9 @@ function PauseOverlay({ room }: { room: RoomView }) {
             {t('等待 {name} 決定（玩家回來後會自動繼續）…', { name: paused.deciderSeat !== null ? playerName(room.players[paused.deciderSeat]) : t('玩家') })}
           </p>
         )}
-        <button className="link" onClick={() => (room.mySeat === null || confirm(t('確定要離開牌局嗎？'))) && send({ t: 'leaveRoom' })}>
+        <ReqButton className="link" run={() => (room.mySeat === null || confirm(t('確定要離開牌局嗎？'))) && request({ t: 'leaveRoom' })}>
           {room.mySeat === null ? t('離開觀戰') : t('離開房間')}
-        </button>
+        </ReqButton>
       </div>
     </div>
   );
@@ -1259,9 +1266,9 @@ function SpectatorLayout({ room, game, now, landscape }: { room: RoomView; game:
         {t('牌型表')}
       </button>
       <LangSelect />
-      <button className="chip-btn" onClick={() => send({ t: 'leaveRoom' })}>
+      <ReqButton className="chip-btn" run={() => request({ t: 'leaveRoom' })}>
         {t('離開觀戰')}
-      </button>
+      </ReqButton>
     </div>
   );
   const modals = (

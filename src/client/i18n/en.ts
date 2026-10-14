@@ -5,6 +5,7 @@ export const en: Record<string, string> = {
   '無法連線': 'Cannot connect',
   '連線中…': 'Connecting…',
   '重新連線中…': 'Reconnecting…',
+  '連線中斷，請稍候再試': 'Disconnected. Please try again in a moment.',
   '伺服器版本（v{server}）與網頁版本（v{client}）不一致，請重新啟動伺服器後再重新整理頁面。':
     'Server version (v{server}) does not match the web page (v{client}). Restart the server, then reload the page.',
   '此瀏覽器不支援所需的加密功能': 'This browser does not support the required cryptography.',

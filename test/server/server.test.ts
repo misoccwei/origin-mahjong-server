@@ -67,6 +67,23 @@ describe('身分與暱稱', () => {
     expect(ok && ok.t === 'authOk' && ok.nickname).toBe('Alice');
   });
 
+  it('請求帶 rid 時，處理完（錯誤訊息、狀態推送都送出後）回 done；沒帶 rid 不回', async () => {
+    const a = await client('Rid');
+    const sendRaw = (msg: object) => (a as unknown as { ws: { send: (s: string) => void } }).ws.send(JSON.stringify(msg));
+    // 送出請求，回傳到 done 為止收到的訊息種類
+    const req = async (msg: object, rid: number) => {
+      const from = a.messages.length;
+      sendRaw({ ...msg, rid });
+      await a.waitFor(() => a.messages.some((m) => m.t === 'done' && m.rid === rid));
+      return a.messages.slice(from).map((m) => m.t);
+    };
+    expect(await req({ t: 'joinRoom', roomId: '0000' }, 1)).toEqual(['error', 'done']);
+    expect(await req({ t: 'createRoom', settings: { randomSeats: false } }, 2)).toEqual(['state', 'done']);
+    a.send({ t: 'addAI' });
+    await a.waitFor(() => a.room?.players[1].nickname);
+    expect(a.messages.filter((m) => m.t === 'done')).toHaveLength(2);
+  });
+
   it('同一使用者從新連線登入時，舊連線被踢除', async () => {
     const key = await newKey();
     const a = await client('Dup', key);

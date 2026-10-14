@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 14;
+export const PROTOCOL_VERSION = 15;
 
 // ---- 遊戲行動 ----
 
@@ -234,6 +234,9 @@ export type ClientMessage =
   | { t: 'rtc'; to: string; data: RtcSignal }
   | { t: 'ping' };
 
+/** 需要等回覆的請求帶 rid：伺服器處理完（錯誤訊息、狀態推送都送出後）回 { t: 'done', rid }，網頁端據此顯示等待中 */
+export type ClientRequest = ClientMessage & { rid?: number };
+
 export type ServerMessage =
   | { t: 'challenge'; nonce: string; protocol: number }
   | { t: 'authOk'; userId: string; nickname: string | null }
@@ -243,6 +246,7 @@ export type ServerMessage =
   | { t: 'kicked'; reason: string }
   | { t: 'roomList'; rooms: RoomSummary[] }
   | { t: 'rtc'; from: string; data: RtcSignal }
-  | { t: 'pong' };
+  | { t: 'pong' }
+  | { t: 'done'; rid: number };
 
 export const AUTH_PREFIX = 'origin-mahjong-auth:';
