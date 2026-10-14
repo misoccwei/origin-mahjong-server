@@ -680,7 +680,7 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
           {t('普通型')}
         </button>
         <button role="tab" aria-selected={recoMode === 'outcome'} className={recoMode === 'outcome' ? 'on' : ''} onClick={() => pick('outcome')}>
-          {t('進階型（看和牌結果）')}
+          {t('進階型')}
         </button>
       </div>
       {recoMode === 'basic' ? <BasicReco room={room} game={game} /> : <OutcomeReco room={room} game={game} />}
@@ -691,7 +691,28 @@ function RecoPanel({ room, game, mode, onClose }: { room: RoomView; game: GameVi
 /** 普通型列出的牌型：和牌率至少要有這麼多 */
 const MIN_SHOWN_RATE = 0.01;
 
-/** 普通型：各牌型的向聽數、有效牌、和牌率與期望值 */
+/** 怎麼湊：打出的牌（劃掉）→ 要的牌；要的牌太多時只列前幾種 */
+function DrawPlan({ discard, wanted, ukeire, max = 9 }: { discard?: TileKind; wanted: TileKind[]; ukeire?: number; max?: number }) {
+  if (discard === undefined && !wanted.length) return null;
+  return (
+    <div className="reco-plan draw-plan">
+      {discard !== undefined && (
+        <span className="reco-out" title={t('打')}>
+          <Tile kind={discard} small />
+        </span>
+      )}
+      {discard !== undefined && wanted.length > 0 && <span className="reco-arrow" aria-hidden="true">→</span>}
+      <span className="reco-want" title={ukeire !== undefined ? t('有效牌 {n} 張', { n: ukeire }) : undefined}>
+        {wanted.slice(0, max).map((k) => (
+          <Tile key={k} kind={k} small />
+        ))}
+        {wanted.length > max && <span className="reco-more">+{wanted.length - max}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** 普通型：各牌型「打什麼 → 要什麼」，加上向聽數、分數與和牌率 */
 function BasicReco({ room, game }: { room: RoomView; game: GameView }) {
   const me = room.players[room.mySeat!];
   const { recs, fast } = useMemo(() => {
@@ -701,54 +722,38 @@ function BasicReco({ room, game }: { room: RoomView; game: GameView }) {
   }, [game.myHand, room.players, me.melds, me.wind, room.settings, game.wallRemaining]);
   return (
     <>
-      <div className="reco-fast">
+      <div className="reco-row reco-fast">
         <div className="reco-title">
-          <span>{t('最快和牌')}</span>
-          <span className="small muted">
-            {t('{shanten}・有效牌 {n} 張', { shanten: shantenText(fast.shanten), n: fast.ukeire })}
+          <span>
+            {t('最快和牌')}
+            <span className="reco-tag">{shantenText(fast.shanten)}</span>
           </span>
         </div>
-        {fast.discard !== undefined && (
-          <div className="reco-discard">
-            <span className="small muted">{t('建議打')}</span>
-            <Tile kind={fast.discard} small />
-          </div>
-        )}
+        <DrawPlan discard={fast.discard} wanted={fast.wanted} ukeire={fast.ukeire} />
       </div>
       {recs.length === 0 && <p className="muted small">{room.settings.minWinScore > 0 ? t('目前沒有推薦（已排除未達和牌最低分數的牌型）') : t('目前沒有推薦')}</p>}
-      {/* 依期望值排序；分成可以吃碰做牌的，以及只能自己摸進來（門清）的 */}
-      {([true, false] as const).map((callable) => {
-        const group = recs.filter((r) => r.callable === callable);
-        if (!group.length) return null;
-        return (
-          <section key={String(callable)} className="reco-group">
-            <div className="reco-group-title small">{callable ? t('可吃碰') : t('門清（只能自己摸進來）')}</div>
-            <ol>
-              {group.map((r) => (
-                <li key={r.id}>
-                  <div className="reco-title">
-                    <span>{t(r.name)}</span>
-                    <span className="pts">{t('{n} 分', { n: r.points })}</span>
-                  </div>
-                  <div className="small muted">
-                    {t('{shanten}・有效牌 {n} 張', { shanten: shantenText(r.shanten), n: r.ukeire })}
-                  </div>
-                  <div className="small reco-ev">
-                    {t('和牌率 {rate}%・期望 {ev} 分', { rate: percent(r.winRate), ev: r.ev.toFixed(1) })}
-                  </div>
-                  {r.discard !== undefined && (
-                    <div className="reco-discard">
-                      <span className="small muted">{t('朝這個牌型打')}</span>
-                      <Tile kind={r.discard} small />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </section>
-        );
-      })}
-      <p className="small muted">{t('依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數）。一定要拿到特定牌的牌型（番牌、三元、一氣通貫、三色同順、暗刻、七對子、五門齊等）以那幾張牌拿得到的機率計算；已經沒有剩牌或和牌率不到 1% 的牌型不列出。僅供參考。')}</p>
+      <ol className="reco-list">
+        {recs.map((r) => (
+          <li key={r.id} className="reco-row">
+            <div className="reco-title">
+              <span>
+                {t(r.name)}
+                <span className="reco-tag">{shantenText(r.shanten)}</span>
+                {!r.callable && <span className="reco-tag">{t('門清')}</span>}
+              </span>
+              <span className="pts">
+                {t('{n} 分', { n: r.points })}
+                <span className="reco-rate">{percent(r.winRate)}%</span>
+              </span>
+            </div>
+            <DrawPlan discard={r.discard} wanted={r.wanted} ukeire={r.ukeire} />
+          </li>
+        ))}
+      </ol>
+      <details className="reco-note">
+        <summary>{t('說明')}</summary>
+        {t('依手牌與河裡看得到的牌估計有效牌、和牌率與期望值（和牌率 × 分數）。一定要拿到特定牌的牌型（番牌、三元、一氣通貫、三色同順、暗刻、七對子、五門齊等）以那幾張牌拿得到的機率計算；已經沒有剩牌或和牌率不到 1% 的牌型不列出。僅供參考。')}
+      </details>
     </>
   );
 }
@@ -781,50 +786,55 @@ function OutcomeReco({ room, game }: { room: RoomView; game: GameView }) {
     <>
       {r.plans.map((plan, i) => (
         <section key={i} className="outcome-plan">
-          <div className="reco-discard">
-            {plan.call && (
-              <>
-                <span className="small muted">{plan.call.type === 'pon' ? t('碰') : t('吃')}</span>
-                {plan.call.kinds.map((k, j) => (
-                  <Tile key={j} kind={k} small />
-                ))}
-              </>
-            )}
-            {!plan.call && claim && <span className="small muted">{t('不鳴')}</span>}
-            {plan.discard !== undefined && (
-              <>
-                <span className="small muted">{t('打')}</span>
-                <Tile kind={plan.discard} small />
-              </>
-            )}
-            <span className="small muted">{t('之後（{shanten}）', { shanten: shantenText(plan.shanten) })}</span>
+          <div className="reco-title">
+            <span className="reco-plan">
+              {plan.call && (
+                <>
+                  <span className="reco-tag">{plan.call.type === 'pon' ? t('碰') : t('吃')}</span>
+                  {plan.call.kinds.map((k, j) => (
+                    <Tile key={j} kind={k} small />
+                  ))}
+                </>
+              )}
+              {!plan.call && claim && <span className="reco-tag">{t('不鳴')}</span>}
+              {plan.discard !== undefined && (
+                <span className="reco-out" title={t('打')}>
+                  <Tile kind={plan.discard} small />
+                </span>
+              )}
+              <span className="reco-tag">{shantenText(plan.shanten)}</span>
+            </span>
+            <span className="pts">
+              {t('期望 {ev} 分', { ev: plan.ev.toFixed(1) })}
+              <span className="reco-rate">{percent(plan.winRate)}%</span>
+            </span>
           </div>
-          <div className="small reco-ev">{t('和牌率 {rate}%・期望 {ev} 分', { rate: percent(plan.winRate), ev: plan.ev.toFixed(1) })}</div>
-          <ol>
+          <ol className="reco-list">
             {plan.groups.slice(0, 6).map((g) => (
-              <li key={g.via + g.draws.join()}>
+              <li key={g.via + g.draws.join()} className="reco-row">
                 <div className="reco-title">
-                  <span className="outcome-draws">
-                    <span className="small muted">{viaLabel(g, plan)}</span>
+                  <span className="reco-plan">
+                    <span className="reco-tag">{viaLabel(g, plan)}</span>
                     {g.draws.map((k) => (
                       <Tile key={k} kind={k} small />
                     ))}
-                    <span className="small muted">{t('剩 {n} 張', { n: g.left })}</span>
+                    <span className="reco-more">{t('剩 {n} 張', { n: g.left })}</span>
                   </span>
-                  <span className="pts">{t('{n} 分', { n: g.total })}</span>
+                  <span className="pts">
+                    {t('{n} 分', { n: g.total })}
+                    <span className="reco-rate">{percent(g.rate)}%</span>
+                  </span>
                 </div>
-                <div className="small muted">
-                  {g.yaku.map((y) => (y.includes('×') ? y.replace(/^(.*)×/, (_, n) => `${t(n)}×`) : t(y))).join(t('・'))}
-                  <span className="outcome-rate">{percent(g.rate)}%</span>
-                </div>
+                <div className="reco-yaku">{g.yaku.map((y) => (y.includes('×') ? y.replace(/^(.*)×/, (_, n) => `${t(n)}×`) : t(y))).join(t('・'))}</div>
               </li>
             ))}
           </ol>
         </section>
       ))}
-      <p className="small muted">
+      <details className="reco-note">
+        <summary>{t('說明')}</summary>
         {t('往下展開摸牌、碰、吃到和牌，依剩下的巡數估計每種打法的和牌率與期望得分（和牌分數 × 機率；自摸、銃和分開計分，不含偶然類），依期望得分排序。每一組是第一張拿到的牌與最可能的和法，百分比是經由這組牌和牌的機率；聽牌時也會考慮摸到某張後改聽。看不到剩的牌與未達和牌最低分數的和法不算。')}
-      </p>
+      </details>
     </>
   );
 }

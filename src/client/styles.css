@@ -191,11 +191,12 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .info-tabs button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
 .info-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; background: rgba(255, 255, 255, 0.06); border-radius: 0 0 12px 12px; }
 .info-body .my-top { min-height: 0; }
-.reco-panel.card { background: transparent; color: #f4f1e8; box-shadow: none; padding: 0; font-size: 0.9em; }
-.reco-panel.card .muted, .reco-panel.card .small.muted { color: #b7cfc3; }
-.reco-panel.card .reco-fast { background: rgba(0, 0, 0, 0.2); border-color: rgba(255, 255, 255, 0.15); }
-.reco-panel.card li { border-bottom-color: rgba(255, 255, 255, 0.12); }
-.reco-panel.card ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.reco-panel.card { background: transparent; color: #f4f1e8; box-shadow: none; padding: 0; }
+.reco-panel.card .muted, .reco-panel.card .small.muted, .reco-panel.card .reco-note, .reco-panel.card .reco-yaku,
+.reco-panel.card .reco-more, .reco-panel.card .reco-rate, .reco-panel.card .reco-arrow { color: #b7cfc3; }
+.reco-panel.card .reco-fast { background: rgba(0, 0, 0, 0.2); }
+.reco-panel.card .reco-row { border-bottom-color: rgba(255, 255, 255, 0.12); }
+.reco-panel.card .reco-tag { background: rgba(255, 255, 255, 0.14); }
 .reco-panel.card .reco-title .pts { color: var(--gold); }
 .swap-card { display: grid; gap: 6px; }
 .hint-extras { display: grid; gap: 6px; margin-bottom: 6px; }
@@ -412,23 +413,35 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .reco-panel.beside { max-height: 100%; }
 
 .reco-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.reco-fast { border: 1px solid #e2dccb; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
-.reco-panel ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.reco-panel li { border-bottom: 1px solid #e7e2d3; padding-bottom: 6px; }
-.reco-group { display: grid; gap: 6px; margin-top: 8px; }
-.reco-mode { display: flex; gap: 4px; margin-bottom: 8px; }
-.reco-mode button { flex: 1; padding: 5px 8px; font-size: 0.85em; box-shadow: none; }
+.reco-mode { display: flex; gap: 4px; margin-bottom: 6px; }
+.reco-mode button { flex: 1; padding: 4px 8px; font-size: 0.85em; box-shadow: none; }
 .reco-mode button.on, .reco-mode button.on:hover:not(:disabled) { background: var(--gold); border-color: var(--gold); color: #fff; }
-.outcome-plan { display: grid; gap: 6px; margin-bottom: 10px; }
-.reco-panel.card .outcome-plan ol { grid-template-columns: 1fr; }
-.outcome-draws { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; }
-.outcome-rate { float: right; margin-left: 6px; font-variant-numeric: tabular-nums; }
-.reco-group-title { font-weight: 700; color: var(--gold); }
-.reco-ev { font-weight: 600; font-variant-numeric: tabular-nums; }
-.reco-title { display: flex; justify-content: space-between; font-weight: 600; }
-.reco-title .pts { color: var(--accent); }
-.reco-discard { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 4px; }
-.reco-panel .tile.small { --tw: 20px; }
+/* 推薦牌型：字小、一列一個牌型；「劃掉的牌 → 要的牌」看得出怎麼湊 */
+.reco-panel { font-size: 0.82em; line-height: 1.35; }
+.reco-panel .tile.small { --tw: 18px; }
+.reco-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.reco-row { display: grid; gap: 3px; padding: 5px 0; border-bottom: 1px solid #e7e2d3; min-width: 0; }
+.reco-fast { padding: 5px 8px; margin-bottom: 4px; border: none; border-radius: 8px; background: #fff; }
+.reco-title { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 600; }
+.reco-title .pts { color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reco-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.07); font-size: 0.85em; font-weight: 500; white-space: nowrap; }
+.reco-plan .reco-tag { margin: 0 3px 0 0; }
+.reco-rate { margin-left: 6px; color: var(--muted); }
+.reco-plan { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; }
+/* 打出的牌：變淡加一條紅色斜線 */
+.reco-out { position: relative; display: inline-flex; opacity: 0.55; margin-right: 2px; }
+.reco-out::after { content: ''; position: absolute; left: -3px; right: -3px; top: 50%; border-top: 2px solid var(--accent); transform: rotate(-40deg); }
+.reco-arrow { margin: 0 3px; color: var(--muted); }
+.reco-want { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 1px; }
+/* 打 → 要：劃掉的牌與箭頭固定在左邊（對齊要的牌的中間），要的牌太多時在右邊換行 */
+.draw-plan { flex-wrap: nowrap; }
+.draw-plan .reco-want { flex: 1; min-width: 0; }
+.reco-more { margin-left: 3px; font-size: 0.85em; color: var(--muted); white-space: nowrap; }
+.reco-yaku { font-size: 0.85em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outcome-plan { display: grid; gap: 2px; margin-bottom: 8px; }
+.outcome-plan > .reco-title { padding: 4px 0; border-bottom: 1px solid var(--gold); }
+.reco-note { margin-top: 6px; font-size: 0.85em; color: var(--muted); }
+.reco-note summary { cursor: pointer; }
 
 /* ---- 對話框 ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 10; padding: 16px; }

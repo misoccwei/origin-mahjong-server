@@ -26,6 +26,8 @@ export interface Recommendation {
   ukeire: number;
   /** 手上多一張時：朝這個牌型建議打出的牌 */
   discard?: TileKind;
+  /** 有效牌的種類（打掉 discard 後，摸到會讓向聽數下降、還有剩的牌） */
+  wanted: TileKind[];
   /** 可以靠吃碰做牌；false = 門清牌型，只能自己摸進來 */
   callable: boolean;
   /** 估計的和牌率（0～1） */
@@ -181,6 +183,19 @@ interface Efficiency {
 }
 
 /** 某個評估函式的有效牌：還沒看到的牌中，摸到後向聽數下降的張數 */
+/** 有效牌的種類（只在最後列出推薦時算，不放在評估迴圈裡） */
+function wantedKinds(c: number[] | undefined, s: number, evaluate: Evaluator, visible: number[]): TileKind[] {
+  if (!c || !Number.isFinite(s) || s < 0) return [];
+  const out: TileKind[] = [];
+  for (let k = 0; k < KIND_COUNT; k++) {
+    if (4 - visible[k] <= 0) continue;
+    c[k]++;
+    if (evaluate(c) < s) out.push(k);
+    c[k]--;
+  }
+  return out;
+}
+
 function ukeireOf(c: number[], s: number, evaluate: Evaluator, visible: number[]) {
   let total = 0;
   for (let k = 0; k < KIND_COUNT; k++) {
@@ -671,7 +686,10 @@ export function buildTargets(input: RecommendInput): Target[] {
 
 interface Ranked {
   target: Target;
-  rec: Recommendation;
+  rec: Omit<Recommendation, 'wanted'>;
+  /** 打完牌後的手牌計數與看得到的牌（算有效牌種類用） */
+  after?: number[];
+  visible: number[];
 }
 
 /** 每個牌型（含同一牌型的不同花色）的牌效率與期望值，依期望值排序 */
@@ -701,6 +719,8 @@ function rankTargets(input: RecommendInput): Ranked[] {
       e.shanten < 0 ? 1 : chance ? chance(e.after!, odds) : winProbability(e.shanten, e.ukeire, unseen, draws, t.callable, odds.players, t.tenpai);
     out.push({
       target: t,
+      after: e.after,
+      visible,
       rec: {
         id: t.id,
         name: def.name,
@@ -722,12 +742,13 @@ export function recommendYaku(input: RecommendInput, limit = 5): Recommendation[
   // 同一牌型（例如三種花色的清一色）只留期望值最高的
   const seen = new Set<string>();
   const out: Recommendation[] = [];
-  for (const { rec } of rankTargets(input)) {
+  for (const { rec, target, after, visible } of rankTargets(input)) {
     if (seen.has(rec.id)) continue;
     seen.add(rec.id);
-    out.push(rec);
+    out.push({ ...rec, wanted: wantedKinds(after && [...after], rec.shanten, target.evaluate, visible) });
+    if (out.length >= limit) break;
   }
-  return out.slice(0, limit);
+  return out;
 }
 
 /** 依序比較，第一個不同的值比較小 */
@@ -765,7 +786,7 @@ export function suggestPass(input: RecommendInput, count = 3): TileKind[] {
 }
 
 /** 純牌效率（不看牌型）：最快和牌的向聽數、有效牌與建議打的牌 */
-export function fastestWin(input: RecommendInput): { shanten: number; ukeire: number; discard?: TileKind } {
+export function fastestWin(input: RecommendInput): { shanten: number; ukeire: number; discard?: TileKind; wanted: TileKind[] } {
   const counts = countKinds(input.concealed);
   const meldKinds = input.melds.map((m) => m.tiles.map(kindOf));
   const visible = input.visible ?? countKinds([...input.concealed, ...meldKinds.flat()]);
@@ -775,6 +796,6 @@ export function fastestWin(input: RecommendInput): { shanten: number; ukeire: nu
     if (input.advanced && mc === 0) s = Math.min(s, shantenSevenPairs(c));
     return s;
   };
-  const { shanten, ukeire, discard } = efficiency(counts, evaluate, visible, input.concealed.length % 3 === 2);
-  return { shanten, ukeire, discard };
+  const { shanten, ukeire, discard, after } = efficiency(counts, evaluate, visible, input.concealed.length % 3 === 2);
+  return { shanten, ukeire, discard, wanted: wantedKinds(after && [...after], shanten, evaluate, visible) };
 }

@@ -24,7 +24,19 @@ describe('推薦牌型（牌效率）', () => {
   it('最快和牌：打掉孤張字牌即聽牌，有效牌扣掉自己手上的張數', () => {
     // 123456789m 11p 23p + 東：打東聽 1p／4p（1p 自己已有 2 張 → 剩 2；4p 剩 4）
     const f = fastestWin(input('🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀙🀚🀛🀀'));
-    expect(f).toEqual({ shanten: 0, ukeire: 6, discard: uni('🀀')[0] });
+    expect(f).toEqual({ shanten: 0, ukeire: 6, discard: uni('🀀')[0], wanted: uni('🀙🀜') });
+  });
+
+  it('各牌型列出有效牌的種類（打掉建議的牌之後），剩的張數加起來等於有效牌張數', () => {
+    const hand = '🀙🀚🀛🀜🀝🀟🀠🀡🀆🀆🀆🀇🀐🀈';
+    const own = new Array(34).fill(0);
+    for (const k of uni(hand)) own[k]++;
+    for (const r of rec(hand)) {
+      if (r.shanten < 0) continue;
+      expect(r.wanted.length).toBeGreaterThan(0);
+      expect(r.wanted).not.toContain(r.discard);
+      expect(r.wanted.reduce((a, k) => a + 4 - own[k], 0)).toBe(r.ukeire);
+    }
   });
 
   it('有效牌會扣掉看得到的牌（例如河裡的牌）', () => {
