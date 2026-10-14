@@ -966,8 +966,8 @@ export function ResultBody({ room, r, totals, live }: { room: RoomView; r: HandR
             </section>
           );
         }
-        // 重看時自己的手牌一律顯示（伺服器本來就會送自己的）
-        const visible = shown.includes(s) || (!live && r.hands[s].length > 0);
+        // 別家的手牌有送來就顯示（單人對 AI 時會公開 AI 的手牌）；自己的手牌在局結束時要按「展示」，重看時一律顯示
+        const visible = shown.includes(s) || (r.hands[s].length > 0 && (!live || s !== me));
         return (
           <section key={s} className="result-card other">
             <header>
@@ -1069,12 +1069,24 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
-/** 局數與倒數（以及 ⚙ 選單）：直式放在最上面一排，橫式放在右上角 */
-function TopBar({ game, now, menu }: { game: GameView; now: number; menu?: ReactElement }) {
+/** 單人對 AI：把這一局交給 AI 快速打完（下一局恢復自己打） */
+function FastFinish({ game }: { game: GameView }) {
+  if (!game.solo || game.phase === 'result') return null;
+  if (game.fastFinish) return <span className="badge ai fast-finish">{t('AI 打完中…')}</span>;
+  return (
+    <ReqButton className="chip-btn fast-finish" run={() => confirm(t('這一局交給 AI 快速打完？下一局恢復自己打。')) && request({ t: 'fastFinish' })}>
+      {t('交給 AI 打完')}
+    </ReqButton>
+  );
+}
+
+/** 局數與倒數（以及單人對 AI 的「交給 AI 打完」、⚙ 選單）：直式放在最上面一排，橫式放在右上角 */
+function TopBar({ game, now, menu, extra }: { game: GameView; now: number; menu?: ReactElement; extra?: ReactElement }) {
   const remain = game.deadline && game.phase !== 'result' ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
   return (
     <header className="top-bar">
       {remain !== null && <span className={`top-timer ${remain <= 5 ? 'urgent' : ''}`}>⏱ {remain}</span>}
+      {extra}
       <span className="round">{t('第 {n} / {total} 局', { n: game.handNo, total: game.totalHands })}</span>
       {menu}
     </header>
@@ -1233,7 +1245,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
           </div>
           {board}
           <div className="gutter right">
-            <TopBar game={game} now={now} menu={my.menu} />
+            <TopBar game={game} now={now} menu={my.menu} extra={<FastFinish game={game} />} />
             {reco}
             {my.melds && (
               <div className="side-melds">
@@ -1250,7 +1262,7 @@ function TableLayout({ room, game, now, pointKind, setPointKind, showReco, setSh
   }
   return (
     <div className={`table portrait players-${room.players.length}`}>
-      <TopBar game={game} now={now} menu={my.menu} />
+      <TopBar game={game} now={now} menu={my.menu} extra={<FastFinish game={game} />} />
       <InfoCard room={room} game={game} tab={tab} setTab={setTab} hint={my.top} />
       <div className="stage">{board}</div>
       {my.hand}

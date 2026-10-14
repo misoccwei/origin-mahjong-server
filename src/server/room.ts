@@ -46,6 +46,8 @@ const ok: RoomResult = { ok: true };
 const fail = (error: string): RoomResult => ({ ok: false, error });
 /** 他人的暗槓：牌以 -1 遮蔽 */
 const maskAnkan = (melds: Meld[]): Meld[] => melds.map((m) => (m.type === 'ankan' ? { ...m, tiles: m.tiles.map(() => -1) } : m));
+/** 交給 AI 快速打完一局時，每一步之間的間隔 */
+const FAST_FINISH_MS = 20;
 
 export class Room {
   readonly id: string;
@@ -62,6 +64,8 @@ export class Room {
   private shown = new Set<number>();
   /** 這一局已經用過「長考」的座位 */
   private thought = new Set<number>();
+  /** 單人對 AI：這一局交給 AI 快速打完（下一局恢復） */
+  private fastFinish = false;
   private timers: NodeJS.Timeout[] = [];
   private windowId = '';
   private deadline: number | null = null;
@@ -108,6 +112,16 @@ export class Room {
   private isAISeat(i: number): boolean {
     const s = this.seats[i];
     return !!s && (s.isAI || s.aiControlled);
+  }
+
+  /** 一個真人對上其餘全是 AI：操作不限時、局結束公開 AI 手牌、可以交給 AI 快速打完一局 */
+  isSolo(): boolean {
+    return this.seats.every((s) => s !== null) && this.seats.filter((s) => !s!.isAI).length === 1;
+  }
+
+  /** 由 AI 決定的座位：AI、交給 AI 代打的真人，以及單人對 AI 時交給 AI 快速打完的自己 */
+  private decidedByAI(i: number): boolean {
+    return this.isAISeat(i) || (this.fastFinish && !this.seats[i]?.isAI);
   }
 
   private isHumanActive(i: number): boolean {
@@ -322,6 +336,7 @@ export class Room {
     this.match.startHand();
     this.acks.clear();
     this.thought.clear();
+    this.fastFinish = false;
     this.afterChange();
     return ok;
   }
@@ -398,6 +413,7 @@ export class Room {
     if (this.paused) return fail('牌局暫停中');
     if (handNo !== this.match!.handIndex + 1) return fail('局數不符');
     if (this.seats[seat]!.aiControlled) return fail('目前由 AI 代打');
+    if (this.fastFinish) return fail('這一局已經交給 AI 打完');
     const err = hand.act(seat, action);
     if (err) return fail(err);
     this.afterChange();
@@ -433,6 +449,18 @@ export class Room {
     if (this.thought.has(seat)) return fail('這一局已經長考過了');
     this.thought.add(seat);
     this.deadline += 60_000;
+    this.afterChange();
+    return ok;
+  }
+
+  /** 單人對 AI：自己的座位也交給 AI，快速打完這一局（下一局恢復自己打） */
+  finishHandByAI(userId: string): RoomResult {
+    const seat = this.seatOf(userId);
+    const hand = this.match?.hand;
+    if (seat < 0 || !hand || this.status !== 'playing' || hand.phase === 'ended') return fail('目前沒有進行中的牌局');
+    if (!this.isSolo()) return fail('只有一個人對電腦時才能交給 AI 打完');
+    if (this.paused) return fail('牌局暫停中');
+    this.fastFinish = true;
     this.afterChange();
     return ok;
   }
@@ -486,6 +514,7 @@ export class Room {
       // 自動摸打與自動和牌只維持一局
       for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false);
       this.thought.clear();
+      this.fastFinish = false;
       m.startHand();
     }
     this.afterChange();
@@ -563,7 +592,7 @@ export class Room {
       const wid = `${m.handIndex}:passReveal`;
       if (wid !== this.windowId) {
         this.windowId = wid;
-        this.deadline = Date.now() + this.deps.passRevealMs;
+        this.deadline = Date.now() + (this.fastFinish ? 0 : this.deps.passRevealMs);
       }
       this.later(this.deadline! - Date.now(), () => {
         if (this.windowId !== wid || this.paused) return;
@@ -576,8 +605,10 @@ export class Room {
     const wid = `${m.handIndex}:${hand.phase}:${hand.discardLog.length}:${hand.wallRemaining}:${hand.melds.flat().length}`;
     if (wid !== this.windowId) {
       this.windowId = wid;
-      const secs =
-        hand.phase === 'passThree'
+      // 單人對 AI：操作不限時
+      const secs = this.isSolo()
+        ? 0
+        : hand.phase === 'passThree'
           ? this.settings.turnSeconds * 2
           : hand.phase === 'turn'
             ? this.settings.turnSeconds
@@ -585,9 +616,10 @@ export class Room {
       this.deadline = secs > 0 ? Date.now() + secs * 1000 : null;
     }
     let humanPending = false;
+    const aiDelay = this.fastFinish ? Math.min(this.deps.aiDelayMs, FAST_FINISH_MS) : this.deps.aiDelayMs;
     for (const seat of pendingSeats) {
-      if (this.isAISeat(seat)) {
-        this.later(this.deps.aiDelayMs, () => this.runAI(seat, wid));
+      if (this.decidedByAI(seat)) {
+        this.later(aiDelay, () => this.runAI(seat, wid));
       } else if (autoAction(hand, seat, this.autoOpts(seat))) {
         this.later(Math.min(this.deps.aiDelayMs, 500), () => this.runAuto(seat, wid));
       } else humanPending = true; // 包含自動摸打遇到能槓、要問玩家的情況
@@ -682,7 +714,10 @@ export class Room {
 
   /** 局結果：只公開看得到的手牌（自己、和牌者、聽牌者、主動展示者），連同暗槓一起；其他座位遮蔽 */
   private resultView(r: HandResult, shown: number[], seat: number, acknowledged: number[]): HandResultView {
-    const revealed = (i: number) => i === seat || shown.includes(i) || r.winners.some((w) => w.seat === i) || r.tenpai.some((t) => t.seat === i);
+    // 單人對 AI：AI 的手牌也公開
+    const solo = this.isSolo();
+    const revealed = (i: number) =>
+      i === seat || shown.includes(i) || r.winners.some((w) => w.seat === i) || r.tenpai.some((t) => t.seat === i) || (solo && !!this.seats[i]?.isAI);
     return {
       kind: r.kind,
       winners: r.winners,
@@ -722,7 +757,7 @@ export class Room {
         const d = hand.discardLog[hand.discardLog.length - 1];
         return d && !d.called && hand.phase !== 'ended' ? { seat: d.seat, tile: d.tile } : null;
       })(),
-      pending: !mine || this.seats[seat]!.aiControlled ? null : hand.pending.get(seat) ?? null,
+      pending: !mine || this.seats[seat]!.aiControlled || this.fastFinish ? null : hand.pending.get(seat) ?? null,
       waitingSeats: [...hand.pending.keys()],
       deadline: this.deadline,
       passThreeDone: this.seats.map((_, i) => hand.phase === 'passThree' && !hand.pending.has(i)),
@@ -735,9 +770,11 @@ export class Room {
         : { on: false, win: false, noCall: false },
       thinkAvailable:
         mine &&
-        !this.thought.has(seat) && this.settings.turnSeconds > 0 && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,
+        !this.thought.has(seat) && this.deadline !== null && hand.phase === 'turn' && hand.pending.get(seat)?.kind === 'turn' && !this.seats[seat]!.aiControlled,
       result: r ? this.resultView(r, [...this.shown], seat, [...this.acks]) : null,
       smallHandAvailable: m.smallHandAvailable(),
+      solo: this.isSolo(),
+      fastFinish: this.fastFinish,
     };
   }
 }

@@ -58,6 +58,13 @@ describe('牌桌畫面', () => {
     expect(sideways(1)).toEqual([true, false, false]);
   });
 
+  it('單人對 AI：上方有「交給 AI 打完」，交給 AI 後改顯示 AI 打完中；兩個真人時沒有', () => {
+    const top = (g: ReturnType<typeof game>) => text(render(room(), g).match(/<header class="top-bar">.*?<\/header>/)![0]);
+    expect(top(game({ solo: true }))).toContain('交給 AI 打完');
+    expect(top(game({ solo: true, fastFinish: true }))).toContain('AI 打完中…');
+    expect(top(game())).not.toContain('AI');
+  });
+
   it('長考：可以用時顯示按鈕', () => {
     expect(render(room(), game({ thinkAvailable: true }))).toContain('長考 +60 秒');
     expect(render(room(), game())).not.toContain('長考');

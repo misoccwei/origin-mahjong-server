@@ -218,6 +218,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         return reply(c, room.showHand(userId));
       case 'think':
         return reply(c, room.think(userId));
+      case 'fastFinish':
+        return reply(c, room.finishHandByAI(userId));
       case 'setAuto':
         return reply(c, room.setAuto(userId, !!msg.on, !!msg.win, !!msg.noCall));
       case 'action':

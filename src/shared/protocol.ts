@@ -9,7 +9,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 15;
+export const PROTOCOL_VERSION = 16;
 
 // ---- 遊戲行動 ----
 
@@ -148,6 +148,10 @@ export interface GameView {
   result: HandResultView | null;
   /** 小牌限制：本輪是否還能和小牌 */
   smallHandAvailable: boolean[];
+  /** 一個真人對上其餘全是 AI：操作不限時、局結束公開 AI 手牌、可以交給 AI 快速打完這一局 */
+  solo: boolean;
+  /** 這一局已經交給 AI 快速打完（下一局恢復自己打） */
+  fastFinish: boolean;
 }
 
 export interface PauseView {
@@ -223,6 +227,8 @@ export type ClientMessage =
   | { t: 'showHand' }
   /** 長考：自己的回合延長打牌時限 60 秒（每局一次） */
   | { t: 'think' }
+  /** 單人對 AI：自己的座位也交給 AI，快速打完這一局 */
+  | { t: 'fastFinish' }
   /** 取得等待中的房間列表 */
   | { t: 'listRooms' }
   | { t: 'action'; handNo: number; action: GameAction }

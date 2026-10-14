@@ -97,3 +97,49 @@ describe('結算倒數', () => {
     expect(room.match!.handIndex).toBe(1);
   });
 });
+
+describe('單人對 AI', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  /** humans 位真人（me、guest…）＋其餘 AI，開始牌局 */
+  const setup = (humans = 1) => {
+    const room = makeRoom({ randomSeats: false, passThree: false, turnSeconds: 20, claimSeconds: 10 }, { aiDelayMs: 1000, rng: seededRng(3) });
+    room.join('me', '我');
+    if (humans > 1) room.join('guest', '玩家'), room.setReady('guest', true);
+    while (room.seats.some((s) => !s)) room.addAI('me');
+    expect(room.start('me')).toEqual({ ok: true });
+    return room;
+  };
+
+  it('操作不限時（也不能長考）；有兩個真人時照常限時', () => {
+    const solo = setup();
+    expect(solo.isSolo()).toBe(true);
+    const g = solo.gameView('me')!;
+    expect(g.solo).toBe(true);
+    expect(g.deadline).toBeNull();
+    expect(g.thinkAvailable).toBe(false);
+    const duo = setup(2);
+    expect(duo.isSolo()).toBe(false);
+    expect(duo.gameView('me')!.deadline).not.toBeNull();
+    expect(duo.finishHandByAI('me')).toEqual({ ok: false, error: '只有一個人對電腦時才能交給 AI 打完' });
+  });
+
+  it('交給 AI 快速打完這一局：自己不能再操作，局結束公開 AI 的手牌，下一局恢復', () => {
+    const room = setup();
+    expect(room.finishHandByAI('me')).toEqual({ ok: true });
+    const g = room.gameView('me')!;
+    expect(g.fastFinish).toBe(true);
+    expect(g.pending).toBeNull();
+    expect(room.action('me', 1, { type: 'pass' })).toEqual({ ok: false, error: '這一局已經交給 AI 打完' });
+    // 每一步只等 20 毫秒（AI 平常要 1 秒）
+    for (let i = 0; i < 1000 && room.match!.hand!.phase !== 'ended'; i++) vi.advanceTimersByTime(20);
+    expect(room.match!.hand!.phase).toBe('ended');
+    const r = room.gameView('me')!.result!;
+    for (const s of [1, 2, 3]) expect(r.hands[s].length).toBeGreaterThan(0);
+    room.nextHand('me');
+    vi.advanceTimersByTime(1);
+    const g2 = room.gameView('me')!;
+    expect(g2.handNo).toBe(2);
+    expect(g2.fastFinish).toBe(false);
+  });
+});

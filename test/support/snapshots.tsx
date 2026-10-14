@@ -79,6 +79,8 @@ export function game(patch: Partial<GameView> = {}): GameView {
     thinkAvailable: false,
     result: null,
     smallHandAvailable: [true, true, true, true],
+    solo: false,
+    fastFinish: false,
     ...patch,
   };
 }

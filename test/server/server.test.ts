@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/server/server.js';
 import { PROTOCOL_VERSION } from '../../src/shared/protocol.js';
+import type { RuleSettings } from '../../src/shared/rules.js';
 import { Client, answerAutoStop, newKey, waitMyTurn, type KeyPair } from '../support/wsClient.js';
 
 let server: RunningServer;
@@ -16,6 +17,25 @@ async function client(nickname?: string, key?: KeyPair) {
     await c.waitFor(() => c.messages.find((m) => m.t === 'nicknameOk' || m.t === 'error'));
   }
   return c;
+}
+
+/**
+ * 兩個真人（房主＋自動出牌的玩家）加一個 AI 的三人房，座位依序是房主、玩家、AI。
+ * 只有一個真人時是「單人對 AI」（不限時、公開 AI 手牌），要測限時與手牌遮蔽時用這個。
+ */
+async function duoRoom(name: string, settings: Partial<RuleSettings>) {
+  const host = await client(name);
+  host.send({ t: 'createRoom', settings: { playerCount: 3, ...settings } });
+  const room = await host.waitFor(() => host.room);
+  const guest = await client(name + 'g');
+  guest.autoplay = true;
+  guest.send({ t: 'joinRoom', roomId: room.id });
+  await guest.waitFor(() => guest.room);
+  host.send({ t: 'addAI' });
+  await host.waitFor(() => host.room?.players.every((p) => p.nickname));
+  guest.send({ t: 'ready', ready: true });
+  await host.waitFor(() => host.room?.players[1].ready);
+  return host;
 }
 
 beforeAll(async () => {
@@ -394,18 +414,16 @@ describe('對局', () => {
     await b.waitFor(() => b.room?.settings.aiLevel === 'hard');
   });
 
-  it('局結束：沒和牌也沒聽牌的手牌不公開，可以自己展示', async () => {
-    const host = await client('Y1');
-    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 0, claimSeconds: 0, passThree: false } });
-    await host.waitFor(() => host.room);
-    host.send({ t: 'addAI' });
-    await host.waitFor(() => host.room?.players[1].nickname);
+  it('局結束：沒和牌也沒聽牌的手牌不公開（AI 也是），可以自己展示', async () => {
+    const host = await duoRoom('Y1', { turnSeconds: 0, claimSeconds: 0, passThree: false });
     host.send({ t: 'setAuto', on: true, win: false });
     host.send({ t: 'start' });
     const g = await host.waitFor(() => (answerAutoStop(host), host.game?.phase === 'result' && host.game), 20000);
+    expect(g.solo).toBe(false);
     const r = g.result!;
     const visible = (s: number) => s === 0 || r.winners.some((w) => w.seat === s) || r.tenpai.some((t) => t.seat === s);
     expect(r.hands[1].length > 0).toBe(visible(1));
+    expect(r.hands[2].length > 0).toBe(visible(2));
     expect(r.hands[0].length).toBeGreaterThan(0);
     host.send({ t: 'showHand' });
     await host.waitFor(() => host.game?.result?.shown.includes(0));
@@ -516,11 +534,7 @@ describe('對局', () => {
   });
 
   it('長考：自己的回合延長 60 秒，每局只能一次', async () => {
-    const host = await client('AD1');
-    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 20, claimSeconds: 10, passThree: false } });
-    await host.waitFor(() => host.room);
-    host.send({ t: 'addAI' });
-    await host.waitFor(() => host.room?.players[1].nickname);
+    const host = await duoRoom('AD1', { turnSeconds: 20, claimSeconds: 10, passThree: false });
     host.send({ t: 'start' });
     const g = await waitMyTurn(host);
     expect(g.thinkAvailable).toBe(true);
@@ -558,16 +572,11 @@ describe('對局', () => {
   });
 
   it('逾時自動摸切', async () => {
-    const host = await client('T1');
-    host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 1, claimSeconds: 1 } });
-    const room = await host.waitFor(() => host.room);
-    host.send({ t: 'addAI' });
-    await host.waitFor(() => host.room?.players[1].nickname);
+    const host = await duoRoom('T1', { turnSeconds: 1, claimSeconds: 1 });
     host.send({ t: 'start' });
-    await host.waitFor(() => host.game?.pending?.kind === 'turn');
+    await host.waitFor(() => host.game?.pending?.kind === 'turn' || host.game?.pending?.kind === 'passThree', 5000);
     const discards = () => host.room!.players[0].discards.length;
-    await host.waitFor(() => discards() >= 1, 5000);
-    void room;
+    await host.waitFor(() => discards() >= 1, 8000);
   });
 
   it('不合法的行動被拒絕', async () => {
