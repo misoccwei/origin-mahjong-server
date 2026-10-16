@@ -155,6 +155,28 @@ describe('單人對 AI', () => {
     expect(g2.handNo).toBe(2);
     expect(g2.fastFinish).toBe(false);
   });
+
+  it('電腦代打：照正常速度替自己打，下一局繼續，改回自己打後恢復操作；有兩個真人時不能用', () => {
+    const room = setup();
+    expect(room.setAIPlay('me', true)).toEqual({ ok: true });
+    expect(room.gameView('me')!.aiPlay).toBe(true);
+    expect(room.gameView('me')!.pending).toBeNull();
+    expect(room.action('me', 1, { type: 'pass' })).toEqual({ ok: false, error: '目前由電腦代打' });
+    // 照 AI 平常的速度（每步 1 秒）打完這一局
+    const before = room.match!.hand!.replayLog.length;
+    vi.advanceTimersByTime(999);
+    expect(room.match!.hand!.replayLog.length).toBe(before);
+    for (let i = 0; i < 1000 && room.match!.hand!.phase !== 'ended'; i++) vi.advanceTimersByTime(1000);
+    expect(room.match!.hand!.phase).toBe('ended');
+    room.nextHand('me');
+    vi.advanceTimersByTime(1);
+    expect(room.gameView('me')!.handNo).toBe(2);
+    expect(room.gameView('me')!.aiPlay).toBe(true);
+    expect(room.setAIPlay('me', false)).toEqual({ ok: true });
+    for (let i = 0; i < 100 && !room.gameView('me')!.pending; i++) vi.advanceTimersByTime(1000);
+    expect(room.gameView('me')!.pending).not.toBeNull();
+    expect(setup(2).setAIPlay('me', true)).toEqual({ ok: false, error: '只有一個人對電腦時才能交給電腦代打' });
+  });
 });
 
 describe('回放檔', () => {

@@ -589,4 +589,10 @@ export const en: Record<string, string> = {
   '還沒有打完的局，無法儲存回放': 'No hands have been finished yet, so there is no replay to save',
   '這不是原點麻將的回放檔': 'This is not an Origin Mahjong replay file',
   '這個回放檔來自較新的版本，請重新整理網頁後再試': 'This replay file is from a newer version. Reload the page and try again',
+  '自己的座位交給電腦照正常速度打，下一局也繼續，隨時可以改回自己打': 'Let the computer play your seat at normal speed, including later hands; you can take over any time',
+  '電腦代打': 'AI plays for me',
+  '電腦代打中': 'AI playing for you',
+  '改回自己打': 'Take over',
+  '目前由電腦代打': 'The computer is playing for you',
+  '只有一個人對電腦時才能交給電腦代打': 'The computer can only play for you when you are the only human player',
 };

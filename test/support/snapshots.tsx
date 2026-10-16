@@ -81,6 +81,7 @@ export function game(patch: Partial<GameView> = {}): GameView {
     smallHandAvailable: [true, true, true, true],
     solo: false,
     fastFinish: false,
+    aiPlay: false,
     ...patch,
   };
 }

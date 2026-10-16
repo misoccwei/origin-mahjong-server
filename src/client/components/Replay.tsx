@@ -397,6 +397,7 @@ function gameViewOf(file: ReplayFile, hand: ReplayHand, f: ReplayFrame): GameVie
     smallHandAvailable: new Array(n).fill(true),
     solo: false,
     fastFinish: false,
+    aiPlay: false,
   };
 }
 

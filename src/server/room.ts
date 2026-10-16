@@ -22,6 +22,8 @@ export interface Seat {
   autoWin?: boolean;
   /** 不鳴牌：別人打牌時不吃碰槓（自動略過；能和時仍由玩家決定），持續有效 */
   noCall?: boolean;
+  /** 單人對 AI：自己的座位交給電腦代打（照正常速度，持續到自己關掉） */
+  aiPlay?: boolean;
   /** 等待中斷線的時間（用於等待房間的清理） */
   offlineSince: number | null;
 }
@@ -121,9 +123,10 @@ export class Room {
     return this.seats.every((s) => s !== null) && this.seats.filter((s) => !s!.isAI).length === 1;
   }
 
-  /** 由 AI 決定的座位：AI、交給 AI 代打的真人，以及單人對 AI 時交給 AI 快速打完的自己 */
+  /** 由 AI 決定的座位：AI、交給 AI 代打的真人，以及單人對 AI 時交給電腦代打或快速打完的自己 */
   private decidedByAI(i: number): boolean {
-    return this.isAISeat(i) || (this.fastFinish && !this.seats[i]?.isAI);
+    const s = this.seats[i];
+    return this.isAISeat(i) || (!!s && !s.isAI && (this.fastFinish || (!!s.aiPlay && this.isSolo())));
   }
 
   private isHumanActive(i: number): boolean {
@@ -381,7 +384,7 @@ export class Room {
     this.match = null;
     this.replays = [];
     this.dissolved = false;
-    this.seats = this.seats.map((s) => (s && !s.left ? { ...s, ready: s.isAI, aiControlled: false, autoPlay: false } : null));
+    this.seats = this.seats.map((s) => (s && !s.left ? { ...s, ready: s.isAI, aiControlled: false, autoPlay: false, aiPlay: false } : null));
     this.afterChange();
     return ok;
   }
@@ -416,6 +419,7 @@ export class Room {
     if (handNo !== this.match!.handIndex + 1) return fail('局數不符');
     if (this.seats[seat]!.aiControlled) return fail('目前由 AI 代打');
     if (this.fastFinish) return fail('這一局已經交給 AI 打完');
+    if (this.seats[seat]!.aiPlay) return fail('目前由電腦代打');
     const err = hand.act(seat, action);
     if (err) return fail(err);
     this.afterChange();
@@ -451,6 +455,16 @@ export class Room {
     if (this.thought.has(seat)) return fail('這一局已經長考過了');
     this.thought.add(seat);
     this.deadline += 60_000;
+    this.afterChange();
+    return ok;
+  }
+
+  /** 單人對 AI：自己的座位交給電腦代打（照正常速度，下一局也繼續），關掉後恢復自己打 */
+  setAIPlay(userId: string, on: boolean): RoomResult {
+    const seat = this.seatOf(userId);
+    if (seat < 0) return fail('不在房間中');
+    if (on && !this.isSolo()) return fail('只有一個人對電腦時才能交給電腦代打');
+    this.seats[seat]!.aiPlay = on;
     this.afterChange();
     return ok;
   }
@@ -784,7 +798,7 @@ export class Room {
         const d = hand.discardLog[hand.discardLog.length - 1];
         return d && !d.called && hand.phase !== 'ended' ? { seat: d.seat, tile: d.tile } : null;
       })(),
-      pending: !mine || this.seats[seat]!.aiControlled || this.fastFinish ? null : hand.pending.get(seat) ?? null,
+      pending: !mine || this.seats[seat]!.aiControlled || this.seats[seat]!.aiPlay || this.fastFinish ? null : hand.pending.get(seat) ?? null,
       waitingSeats: [...hand.pending.keys()],
       deadline: this.deadline,
       passThreeDone: this.seats.map((_, i) => hand.phase === 'passThree' && !hand.pending.has(i)),
@@ -802,6 +816,7 @@ export class Room {
       smallHandAvailable: m.smallHandAvailable(),
       solo: this.isSolo(),
       fastFinish: this.fastFinish,
+      aiPlay: mine && !!this.seats[seat]!.aiPlay,
     };
   }
 }

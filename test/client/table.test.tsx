@@ -65,6 +65,14 @@ describe('牌桌畫面', () => {
     expect(top(game())).not.toContain('AI');
   });
 
+  it('電腦代打中：工具列只剩標示與「改回自己打」，沒有自動功能', () => {
+    const html = text(render(room(), game({ solo: true, aiPlay: true, pending: null })));
+    expect(html).toContain('電腦代打中');
+    expect(html).toContain('改回自己打');
+    expect(html).not.toContain('自動打');
+    expect(text(render(room(), game({ solo: true })))).toContain('自動打');
+  });
+
   it('長考：可以用時顯示按鈕', () => {
     expect(render(room(), game({ thinkAvailable: true }))).toContain('長考 +60 秒');
     expect(render(room(), game())).not.toContain('長考');

@@ -348,6 +348,11 @@ function ToolsMenu({ room, game, setAuto }: { room: RoomView; game: GameView; se
       </button>
       {open && (
         <div className="menu-pop" role="menu">
+          {game.solo && !game.aiPlay && game.phase !== 'result' && (
+            <ReqButton title={t('自己的座位交給電腦照正常速度打，下一局也繼續，隨時可以改回自己打')} run={() => (setOpen(false), request({ t: 'setAIPlay', on: true }))}>
+              {t('電腦代打')}
+            </ReqButton>
+          )}
           <button onClick={() => (setShowYaku(true), setOpen(false))}>{t('牌型表')}</button>
           {voice.active && <button onClick={() => (setShowVoice(true), setOpen(false))}>{t('語音設定')}</button>}
           {room.players.some((p) => p.isAI || p.aiControlled) && (
@@ -491,7 +496,16 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
     </div>
   );
 
-  const tools = (
+  // 電腦代打中：自動功能用不到，工具列只留標示、改回自己打與語音
+  const tools = game.aiPlay ? (
+    <div className="my-tools">
+      <span className="badge ai">{t('電腦代打中')}</span>
+      <ReqButton className="chip-btn on" run={() => request({ t: 'setAIPlay', on: false })}>
+        {t('改回自己打')}
+      </ReqButton>
+      <VoiceButtons />
+    </div>
+  ) : (
     <div className="my-tools">
       <button className={`chip-btn ${showReco ? 'on' : ''}`} onClick={toggleReco} aria-pressed={showReco}>
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
