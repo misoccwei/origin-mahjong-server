@@ -556,6 +556,8 @@ export const en: Record<string, string> = {
     'Number tiles only; with suits in some order, the tiles are point-symmetric around the pair.',
   // ---- 牌局回放 ----
   '回放檔已損毀，無法讀取': 'The replay file is damaged and cannot be read',
+  '牌局結束後才能儲存回放': 'The replay can be saved after the game ends',
+  '還沒有打完的局，無法儲存回放': 'No hands have been finished yet, so there is no replay to save',
   '這不是原點麻將的回放檔': 'This is not an Origin Mahjong replay file',
   '這個回放檔來自較新的版本，請重新整理網頁後再試': 'This replay file is from a newer version. Reload the page and try again',
 };

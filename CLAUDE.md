@@ -45,7 +45,8 @@ src/server/
   engine/hand.ts   一局的狀態機（配牌、換三張、摸打、吃碰槓、搶槓、嶺上、流局、結果）
   engine/match.ts  一場：局數、起始玩家輪替、累計分數、小牌限制、加圈
   engine/ai.ts     AI（beginner/easy/normal/hard）與 autoAction（自動摸打／自動和牌／不鳴牌）
-  room.ts          房間：座位、房主、準備、計時、AI 排程、暫停、隨機座位、重看資料（replays）、快照（roomView/gameView）
+  room.ts          房間：座位、房主、準備、計時、AI 排程、暫停、隨機座位、重看資料與回放紀錄（replays、replayFile）、快照（roomView/gameView）
+  replay.ts        replayHandOf：把引擎的一局（hand.deal、hand.replayLog、result）轉成回放檔格式
   server.ts        HTTP 靜態檔 + /ws；把訊息分派給 Room；錯誤訊息是固定中文字串
   users.ts / identity.ts  暱稱、公鑰簽章登入
 src/client/
@@ -62,10 +63,10 @@ src/client/
 
 ## 必須遵守的慣例與陷阱
 
-- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**16**。
+- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**17**。
 - **回放檔格式**：分享出去的檔案會留很久。`replaySchema.ts` 的程式（註解除外）一改，`test/shared/replay.test.ts` 就會失敗：
   把 `REPLAY_SCHEMA_VERSION` 加一、在 `replay.ts` 的 `MIGRATIONS` 寫舊版 → 新版的轉換、放新版範例檔 `test/fixtures/replay-vN.json`（舊的保留），再更新 `RECORDED`。
-  回放只記事件、不重跑規則，所以改規則／計分／AI／協定**不必**動回放版本。
+  回放只記事件、不重跑規則，所以改規則／計分／AI／協定**不必**動回放版本；但引擎新增會改變牌桌的動作時，要在 `hand.ts` 推進 `replayLog`、在 `replayFrame` 處理（`test/server/replay.test.ts` 會檢查每一步牌數守恆、播完與局結果一致）。
 - **新增規則設定**：`rules.ts` 的 `RuleSettings`＋`defaultSettings`＋`sanitizeSettings`（範圍檢查）→ `Lobby.tsx` 的 `SettingsForm` → 需要時 `RoomScreens.tsx` 的 `rulesSummary` → `test/shared/rules.test.ts` → 翻譯 → README → 協定版本加一。
 - **多國語言（最常踩的坑）**：
   - 所有看得到的字都要包 `t('繁中原文')`；含元件（例如牌）的用 `tn('打出 {tile}', { tile: <Tile …/> })`；變數用 `{name}`，不要用字串串接拼句子（語序不同）。
@@ -96,7 +97,7 @@ src/client/
 ```
 test/shared/        scoring、settlement、rules、recommend、recommendShape、outcome、yakuInfo、protocol、replay（格式版本、讀取、範例檔）
 test/server/engine/ hand（指定牌山情境）、match、ai（AI 決策與 autoAction）、simulation（AI 整場模擬，慢）
-test/server/        room（Room 單元測試，vi.useFakeTimers＋固定亂數）、server（WebSocket 整合）
+test/server/        room（Room 單元測試，vi.useFakeTimers＋固定亂數）、server（WebSocket 整合）、replay（回放紀錄重現每一步）
 test/client/        table、result、screens、yakuTable、i18n（伺服器渲染快照）
 test/fixtures/      每一版回放檔格式的範例檔
 test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/makeHand/autoplayUntil/seededRng/playMatch）、

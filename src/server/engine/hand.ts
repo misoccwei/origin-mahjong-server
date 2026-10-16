@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import type { AvailableActions, GameAction, WinScoreView } from '../../shared/protocol.js';
 import { DEAD_WALL, baseScoreFor, seatWindOf, type Meld, type RuleSettings } from '../../shared/rules.js';
 import { bestTenpaiScore, evaluateWin, isWinningShape, waitingKinds, type HandScore, type WinFlags } from '../../shared/scoring.js';
+import type { ReplayEvent } from '../../shared/replaySchema.js';
 import { settle, type SettlementLine } from '../../shared/settlement.js';
 import { TILE_COUNT, kindOf, suitOf, type TileId, type TileKind } from '../../shared/tiles.js';
 
@@ -82,6 +83,10 @@ export class Hand {
   passSent: (TileId[] | null)[];
   passReceived: (TileId[] | null)[];
   result: HandResult | null = null;
+  /** 回放：配牌（換三張之前）、配牌後的牌山張數、依序發生的事件 */
+  deal: TileId[][] = [];
+  wallAfterDeal = 0;
+  replayLog: ReplayEvent[] = [];
   private smallHandAvailable: boolean[];
 
   constructor(opts: HandOptions) {
@@ -115,6 +120,8 @@ export class Hand {
       for (let i = 0; i < this.n; i++) this.hands[(this.startSeat + i) % this.n].push(this.wall.shift()!);
     }
     this.hands.forEach((h) => h.sort((a, b) => a - b));
+    this.deal = this.hands.map((h) => [...h]);
+    this.wallAfterDeal = this.wall.length;
     if (this.settings.passThree) {
       this.phase = 'passThree';
       for (let s = 0; s < this.n; s++) this.pending.set(s, { kind: 'passThree' });
@@ -194,6 +201,7 @@ export class Hand {
         const to = passers[(i + 1) % passers.length];
         this.passReceived[to] = [...outgoing.get(s)!].sort((a, b) => a - b);
       });
+      this.replayLog.push({ t: 'pass', sent: this.passSent.map((x) => x && [...x]), received: this.passReceived.map((x) => x && [...x]) });
     }
     this.passSelections.clear();
     // 不論有沒有人換，都經過亮牌階段，避免從等待時間看出誰沒換
@@ -221,6 +229,7 @@ export class Hand {
         const entry: DiscardEntry = { seat, tile: action.tile, called: false, houtei: !this.canDraw };
         this.discards[seat].push(entry);
         this.discardLog.push(entry);
+        this.replayLog.push({ t: 'discard', s: seat, tile: action.tile });
         this.lastDiscard = entry;
         this.drawn = null;
         this.openClaimWindow(seat, action.tile);
@@ -229,7 +238,9 @@ export class Hand {
       case 'tsumo': {
         if (!avail.tsumo) return '無法自摸';
         const score = this.evaluateTsumo(seat)!;
-        this.endWithWinners([{ seat, tsumo: true, tile: this.drawn ?? hand[hand.length - 1], score }]);
+        const tile = this.drawn ?? hand[hand.length - 1];
+        this.replayLog.push({ t: 'win', s: seat, tile });
+        this.endWithWinners([{ seat, tsumo: true, tile, score }]);
         return null;
       }
       case 'ankan': {
@@ -237,6 +248,7 @@ export class Hand {
         const tiles = hand.filter((t) => kindOf(t) === action.kind);
         this.hands[seat] = hand.filter((t) => kindOf(t) !== action.kind);
         this.melds[seat].push({ type: 'ankan', tiles });
+        this.replayLog.push({ t: 'ankan', s: seat, tiles: [...tiles] });
         this.pending.clear();
         this.beginTurn(seat, 'rinshan');
         return null;
@@ -247,6 +259,7 @@ export class Hand {
         this.pending.clear();
         this.hands[seat] = hand.filter((t) => t !== tile);
         this.kakanPending = { seat, tile };
+        this.replayLog.push({ t: 'kakan', s: seat, tile });
         this.openChankanWindow(seat, tile);
         return null;
       }
@@ -303,6 +316,7 @@ export class Hand {
       if (draw === 'normal') this.drawCount[seat]++;
       this.hands[seat].push(tile);
       this.drawn = tile;
+      this.replayLog.push(draw === 'rinshan' ? { t: 'draw', s: seat, tile, rinshan: true } : { t: 'draw', s: seat, tile });
     } else {
       this.drawn = null;
     }
@@ -487,6 +501,7 @@ export class Hand {
     const rons = order.filter((s) => this.responses.get(s)?.type === 'ron');
     if (rons.length) {
       const houtei = discard.houtei;
+      for (const seat of rons) this.replayLog.push({ t: 'win', s: seat, from: discarder, tile: discard.tile });
       this.endWithWinners(
         rons.map((seat) => ({
           seat,
@@ -523,6 +538,7 @@ export class Hand {
     this.hands[claimer] = hand.filter((t) => !used.includes(t));
     const tiles = [...used, discard.tile].sort((a, b) => a - b);
     this.melds[claimer].push({ type, tiles, calledTile: discard.tile, from: discarder });
+    this.replayLog.push({ t: type, s: claimer, from: discarder, tiles: [...tiles], called: discard.tile });
     this.beginTurn(claimer, type === 'minkan' ? 'rinshan' : 'none');
   }
 
@@ -543,6 +559,7 @@ export class Hand {
     const rons = order.filter((s) => this.responses.get(s)?.type === 'ron');
     this.responses.clear();
     if (rons.length) {
+      for (const seat of rons) this.replayLog.push({ t: 'win', s: seat, from: kakanSeat, tile });
       this.endWithWinners(
         rons.map((seat) => ({ seat, tsumo: false, from: kakanSeat, tile, score: this.evaluateRon(seat, tile, { chankan: true })! })),
       );

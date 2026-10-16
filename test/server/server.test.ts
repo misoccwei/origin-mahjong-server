@@ -294,6 +294,14 @@ describe('對局', () => {
         if (!visible) expect(r.hands[s]).toEqual([]);
       }
     }
+    // 回放檔：要求時才送，含每一局完整的紀錄（四家手牌都公開）
+    expect(host.messages.some((m) => m.t === 'replay')).toBe(false);
+    host.send({ t: 'getReplay' });
+    const file = await host.waitFor(() => host.messages.find((m) => m.t === 'replay'));
+    if (file.t !== 'replay') throw new Error();
+    expect(file.replay.hands.map((h) => h.handNo)).toEqual([1, 2, 3, 4]);
+    expect(file.replay.hands.every((h) => h.deal.every((d) => d.length === 13))).toBe(true);
+    expect(file.replay.finalScores).toEqual(scores);
     // 加一圈
     b.send({ t: 'extend' });
     await b.waitFor(() => b.errors.some((e) => e.includes('房主')));

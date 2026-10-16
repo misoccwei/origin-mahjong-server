@@ -1,8 +1,10 @@
-import type { GameAction, GameView, HandResultView, PlayerView, RoomSummary, RoomView } from '../shared/protocol.js';
+import { PROTOCOL_VERSION, type GameAction, type GameView, type HandResultView, type PlayerView, type RoomSummary, type RoomView } from '../shared/protocol.js';
+import { REPLAY_FORMAT, REPLAY_SCHEMA_VERSION, type ReplayFile, type ReplayHand } from '../shared/replaySchema.js';
 import { sanitizeSettings, type AILevel, type Meld, type RuleSettings } from '../shared/rules.js';
 import { autoAction, decideAction } from './engine/ai.js';
 import type { HandResult, Rng } from './engine/hand.js';
 import { Match } from './engine/match.js';
+import { replayHandOf } from './replay.js';
 
 export interface Seat {
   /** 真人座位的使用者代碼；AI 為 null */
@@ -70,8 +72,8 @@ export class Room {
   private windowId = '';
   private deadline: number | null = null;
   private aiCounter = 0;
-  /** 這場牌局每一局的結果與當時主動展示手牌的座位（加圈時保留，重新開始時清空） */
-  private replays: { handNo: number; result: HandResult; shown: number[] }[] = [];
+  /** 這場牌局每一局的結果、當時主動展示手牌的座位與回放紀錄（加圈時保留，重新開始時清空；只在記憶體裡） */
+  private replays: { handNo: number; result: HandResult; shown: number[]; replay: ReplayHand }[] = [];
   /** 觀戰者：userId → 暱稱與斷線時間 */
   spectators = new Map<string, { nickname: string; offlineSince: number | null }>();
 
@@ -494,6 +496,29 @@ export class Room {
     return ok;
   }
 
+  /** 牌局結束後的回放檔（在座的玩家與觀戰者都可以拿；匿名在網頁端處理） */
+  replayFile(userId: string): { ok: true; replay: ReplayFile } | { ok: false; error: string } {
+    if (this.seatOf(userId) < 0 && !this.spectators.has(userId)) return { ok: false, error: '不在房間中' };
+    if (this.status !== 'finished' || !this.match) return { ok: false, error: '牌局結束後才能儲存回放' };
+    if (!this.replays.length) return { ok: false, error: '還沒有打完的局，無法儲存回放' };
+    return {
+      ok: true,
+      replay: {
+        format: REPLAY_FORMAT,
+        schema: REPLAY_SCHEMA_VERSION,
+        savedAt: new Date().toISOString(),
+        appProtocol: PROTOCOL_VERSION,
+        roomId: this.id,
+        anonymous: false,
+        dissolved: this.dissolved,
+        settings: structuredClone(this.settings) as unknown as Record<string, unknown>,
+        players: this.seats.map((s, i) => ({ seat: i, name: s?.nickname ?? '', isAI: !!s?.isAI })),
+        hands: this.replays.map((x) => x.replay),
+        finalScores: [...this.match.scores],
+      },
+    };
+  }
+
   nextHand(userId: string): RoomResult {
     const seat = this.seatOf(userId);
     if (seat < 0 || this.match?.hand?.phase !== 'ended') return fail('目前不能進入下一局');
@@ -505,7 +530,8 @@ export class Room {
   private advanceHand() {
     const m = this.match;
     if (!m?.hand || m.hand.phase !== 'ended') return;
-    this.replays.push({ handNo: m.handIndex + 1, result: m.hand.result!, shown: [...this.shown] });
+    const handNo = m.handIndex + 1;
+    this.replays.push({ handNo, result: m.hand.result!, shown: [...this.shown], replay: replayHandOf(m.hand, handNo, m.scores) });
     m.completeHand();
     this.acks.clear();
     this.shown.clear();

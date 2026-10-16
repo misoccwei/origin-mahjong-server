@@ -47,6 +47,7 @@ src/
     engine/match.ts  一場牌局：局數、起始玩家輪替、累計分數、加圈
     engine/ai.ts     AI（簡單／普通／困難，依推薦牌型與和牌最低分數調整策略）與自動摸打
     room.ts          房間：座位、房主、準備、計時、AI 排程、斷線暫停與決定
+    replay.ts        把一局轉成回放檔格式
     users.ts         線上使用者與暱稱（不可重複）
     identity.ts      公鑰簽章驗證 → 使用者代碼
     server.ts        HTTP（靜態檔、/healthz）+ WebSocket（/ws）
@@ -177,7 +178,8 @@ test/
   server/
     engine/          一局的狀態機（hand，用指定牌山重現情境）、局數輪替（match）、
                      AI 與自動摸打（ai）、AI 打完整場的模擬（simulation，較慢）
-    room.test.ts     房間的單元測試（假時鐘、固定亂數：隨機座位、結算倒數）
+    replay.test.ts   回放紀錄（AI 與積極鳴牌打完整局，只靠事件重現每一步、播完與局結果一致）
+    room.test.ts     房間的單元測試（假時鐘、固定亂數：隨機座位、結算倒數、回放檔）
     server.test.ts   WebSocket 整合測試（登入、房間、觀戰、語音 signaling、斷線、整場流程）
   client/            畫面（伺服器渲染快照）：牌桌、局結果、大廳／等待房間／最終結算、牌型表、多國語言
   fixtures/          每一版回放檔格式的範例檔（replay-v1.json…），確認舊檔轉換後仍能播完

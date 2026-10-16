@@ -152,3 +152,33 @@ describe('單人對 AI', () => {
     expect(g2.fastFinish).toBe(false);
   });
 });
+
+describe('回放檔', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  it('牌局結束後才能取得；含每一局的紀錄與暱稱，不含使用者代碼', () => {
+    const room = makeRoom({ ...defaultSettings(2), rounds: 1, randomSeats: false, passThree: false }, { aiDelayMs: 10, rng: seededRng(4) });
+    room.join('me', '我');
+    room.addAI('me');
+    room.start('me');
+    expect(room.replayFile('me')).toEqual({ ok: false, error: '牌局結束後才能儲存回放' });
+    for (let i = 0; i < 10 && room.status === 'playing'; i++) {
+      // 每一局都交給 AI 快速打完，結算時按下一局
+      room.finishHandByAI('me');
+      vi.advanceTimersByTime(60_000);
+      room.nextHand('me');
+      vi.advanceTimersByTime(1);
+    }
+    expect(room.status).toBe('finished');
+    const r = room.replayFile('me');
+    if (!r.ok) throw new Error(r.error);
+    expect(r.replay.hands.map((h) => h.handNo)).toEqual([1, 2]);
+    expect(r.replay.players).toEqual([
+      { seat: 0, name: '我', isAI: false },
+      { seat: 1, name: '電腦 1', isAI: true },
+    ]);
+    expect(r.replay.finalScores).toEqual(room.match!.scores);
+    expect(JSON.stringify(r.replay)).not.toContain('"me"');
+    expect(room.replayFile('stranger')).toEqual({ ok: false, error: '不在房間中' });
+  });
+});

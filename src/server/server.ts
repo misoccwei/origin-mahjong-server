@@ -233,6 +233,11 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         return reply(c, room.extend(userId));
       case 'restart':
         return reply(c, room.restart(userId));
+      case 'getReplay': {
+        const r = room.replayFile(userId);
+        if (!r.ok) return send(c.ws, { t: 'error', code: 'replay', message: r.error });
+        return send(c.ws, { t: 'replay', replay: r.replay });
+      }
       case 'rtc': {
         // 只轉給同房間的其他真人；內容不解讀
         const to = String(msg.to ?? '');

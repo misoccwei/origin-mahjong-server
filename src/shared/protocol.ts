@@ -1,5 +1,6 @@
 // Client <-> Server 訊息格式（WebSocket，JSON）
 import type { AILevel, Meld, RuleSettings } from './rules.js';
+import type { ReplayFile } from './replaySchema.js';
 import type { HandScore } from './scoring.js';
 import type { SettlementLine } from './settlement.js';
 import type { TileId, TileKind } from './tiles.js';
@@ -9,7 +10,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 16;
+export const PROTOCOL_VERSION = 17;
 
 // ---- 遊戲行動 ----
 
@@ -236,6 +237,8 @@ export type ClientMessage =
   | { t: 'decide'; choice: 'ai' | 'dissolve' }
   | { t: 'extend' }
   | { t: 'restart' }
+  /** 牌局結束後取得整場的回放檔（伺服器回 { t: 'replay' }） */
+  | { t: 'getReplay' }
   /** 語音 signaling：只會轉給同房間的真人 */
   | { t: 'rtc'; to: string; data: RtcSignal }
   | { t: 'ping' };
@@ -253,6 +256,7 @@ export type ServerMessage =
   | { t: 'roomList'; rooms: RoomSummary[] }
   | { t: 'rtc'; from: string; data: RtcSignal }
   | { t: 'pong' }
+  | { t: 'replay'; replay: ReplayFile }
   | { t: 'done'; rid: number };
 
 export const AUTH_PREFIX = 'origin-mahjong-auth:';
