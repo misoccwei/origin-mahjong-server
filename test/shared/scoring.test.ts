@@ -322,5 +322,15 @@ describe('每張聽的牌各自的和牌', () => {
     expect(names('🀟')).toContain('混一色');
     expect(r[0].score.total).toBeGreaterThan(r[1].score.total);
   });
+
+  it('聽的牌依分數高到低排列（不是牌的順序）', () => {
+    // 12345678p 東東東 白白：聽三、六、九筒，九筒有一氣通貫、分數最高
+    const hand = uni('🀙🀚🀛🀜🀝🀞🀟🀠🀀🀀🀀🀆🀆');
+    const r = scoreByWait(hand, [], uni('🀀')[0], true, 0);
+    expect(r[0].tile).toBe(uni('🀡')[0]);
+    expect(r[0].score.yaku.map((y) => y.name)).toContain('一氣通貫');
+    for (let i = 1; i < r.length; i++) expect(r[i - 1].score.total).toBeGreaterThanOrEqual(r[i].score.total);
+    expect(bestTenpaiScore(hand, [], uni('🀀')[0], true, 0)!.waits).toEqual(r.map((x) => x.tile));
+  });
 });
 

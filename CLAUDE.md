@@ -125,7 +125,7 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | --- | --- |
 | 打牌、鳴牌按鈕（含固定位置的「打出」） | Table.tsx `CallOverlay`、`useMyArea` |
 | 鳴牌排列（轉橫的牌朝向來源座位） | rules.ts `meldTileOrder`、Table.tsx `MeldView` |
-| 聽牌／打出前提示每張聽牌的牌型與分數 | Table.tsx `Waits`/`DiscardWaits`/`WaitList`（`waitRows` 自摸、銃和分開算） |
+| 聽牌／打出前提示每張聽牌的牌型與分數（依分數高到低排列） | Table.tsx `Waits`/`DiscardWaits`/`WaitList`（`waitRows` 自摸、銃和分開算並排序）；局結果的聽牌順序來自 scoring.ts `bestTenpaiScore` |
 | 自摸／和按鈕上的分數與牌型 | hand.ts `winScoreView`（`AvailableActions.winScore`）、Table.tsx `winLabel` |
 | 推薦牌型（普通型／進階型切換、鳴牌時比較鳴與不鳴；「劃掉的牌 → 要的牌」圖示） | Table.tsx `RecoPanel`/`BasicReco`/`OutcomeReco`/`DrawPlan`、recommend.ts（`wanted` 只在最後選出的推薦上算）、outcome.ts |
 | AI 策略（依和牌最低分數、換三張） | ai.ts `decideAction`（`recInput`、`needsYaku`、`suggestPass`） |

@@ -708,16 +708,20 @@ export function bestTenpaiScore(
   const waits = waitingKinds(concealed, melds, advanced, expansion);
   if (!waits.length) return null;
   let best: { score: HandScore; tile: TileKind; tsumo: boolean } | null = null;
+  // 每張聽牌的最高分（和不了為 -1），聽的牌依分數高到低排列
+  const top = new Map<TileKind, number>();
   for (const w of waits) {
+    top.set(w, -1);
     for (const tsumo of [true, false]) {
       const s = evaluateWin({ concealed: [...concealed, w], melds, winTile: w, tsumo, seatWind, advanced, baseScore, expansion });
+      if (s && s.total > top.get(w)!) top.set(w, s.total);
       if (s && (!best || s.total > best.score.total)) best = { score: s, tile: w, tsumo };
     }
   }
-  return best ? { ...best, waits } : null;
+  return best ? { ...best, waits: [...waits].sort((a, b) => top.get(b)! - top.get(a)! || a - b) } : null;
 }
 
-/** 聽牌時每一張聽的牌各自的最高和牌（自摸或銃和取高者，不含偶然類）；未聽牌回傳空陣列 */
+/** 聽牌時每一張聽的牌各自的最高和牌（自摸或銃和取高者，不含偶然類），依分數高到低排列；未聽牌回傳空陣列 */
 export function scoreByWait(
   concealed: TileKind[],
   melds: Meld[],
@@ -735,5 +739,5 @@ export function scoreByWait(
     }
     if (best) out.push(best);
   }
-  return out;
+  return out.sort((a, b) => b.score.total - a.score.total || a.tile - b.tile);
 }

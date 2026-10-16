@@ -158,6 +158,17 @@ describe('牌桌畫面', () => {
     expect(out).toMatch(/×3 \d+ 分 [^ ]*平和/);
   });
 
+  it('聽牌列表依分數高到低排列：九筒（一氣通貫）排在三、六筒前面', () => {
+    // 12345678p 東東東 白白
+    const myHand = [9, 10, 11, 12, 13, 14, 15, 16, 27, 27, 27, 33, 33].map((k, i) => tid(k, k >= 27 ? i % 3 : 0));
+    const html = render(room(), game({ myHand, myWaits: [11, 14, 17].map((kind) => ({ kind, left: 3 })), myWaitScore: { min: 20, max: 80 } }));
+    const list = html.slice(html.indexOf('聽牌：'));
+    const at = (n: number) => list.indexOf(`/tiles/Pin${n}.svg`);
+    expect(at(9)).toBeGreaterThan(0);
+    expect(at(9)).toBeLessThan(at(3));
+    expect(at(9)).toBeLessThan(at(6));
+  });
+
   it('和牌、自摸按鈕上顯示現在和的分數與牌型', () => {
     const winScore = { total: 45, yaku: [{ name: '混一色', count: 1 }, { name: '番牌', count: 2 }] };
     const ron = text(render(room(), game({ phase: 'claim', currentSeat: 1, recentDiscard: { seat: 1, tile: tid(27) }, pending: { kind: 'claim', ron: true, winScore } })));

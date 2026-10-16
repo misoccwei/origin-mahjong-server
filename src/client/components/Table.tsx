@@ -202,7 +202,7 @@ interface WaitRow {
   ron: HandScore | null;
 }
 
-/** 手牌（13 張減鳴牌）聽的每一張牌：自摸與銃和各自的和牌（不含偶然類） */
+/** 手牌（13 張減鳴牌）聽的每一張牌：自摸與銃和各自的和牌（不含偶然類），依分數高到低排列（和不了的放最後） */
 function waitRows(room: RoomView, game: GameView, concealed: TileKind[], waits: TileKind[]): WaitRow[] {
   const me = room.players[room.mySeat!];
   const { visible } = recommendInput(room, game);
@@ -217,7 +217,10 @@ function waitRows(room: RoomView, game: GameView, concealed: TileKind[], waits: 
       baseScore: baseScoreFor(room.settings, me.seat),
       expansion: room.settings.expansion,
     });
-  return waits.map((k) => ({ kind: k, left: Math.max(0, 4 - visible[k]), tsumo: score(k, true), ron: score(k, false) }));
+  const top = (r: WaitRow) => Math.max(r.tsumo?.total ?? -1, r.ron?.total ?? -1);
+  return waits
+    .map((k) => ({ kind: k, left: Math.max(0, 4 - visible[k]), tsumo: score(k, true), ron: score(k, false) }))
+    .sort((a, b) => top(b) - top(a) || a.kind - b.kind);
 }
 
 /** 聽的每一張牌：剩幾張、和了幾分（自摸與銃和不同時分開寫）、牌型；未達和牌最低分數的標明 */
