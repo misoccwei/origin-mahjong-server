@@ -177,6 +177,38 @@ describe('單人對 AI', () => {
     expect(room.gameView('me')!.pending).not.toBeNull();
     expect(setup(2).setAIPlay('me', true)).toEqual({ ok: false, error: '只有一個人對電腦時才能交給電腦代打' });
   });
+
+  it('換三張亮牌不倒數：按「放進手牌」才繼續；電腦代打、自動摸打時照 AI 的速度自動繼續', () => {
+    const toReveal = () => {
+      const room = makeRoom({ randomSeats: false, passThree: true }, { aiDelayMs: 1000, passRevealMs: 3000, rng: seededRng(3) });
+      room.join('me', '我');
+      while (room.seats.some((s) => !s)) room.addAI('me');
+      room.start('me');
+      room.action('me', 1, { type: 'passThree', tiles: null });
+      // 三個 AI 依序各花 1 秒決定
+      vi.advanceTimersByTime(3000);
+      expect(room.match!.hand!.phase).toBe('passReveal');
+      return room;
+    };
+    const room = toReveal();
+    expect(room.gameView('me')!.deadline).toBeNull();
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(room.match!.hand!.phase).toBe('passReveal');
+    expect(room.confirmPassReveal('me')).toEqual({ ok: true });
+    expect(room.match!.hand!.phase).toBe('turn');
+    expect(room.confirmPassReveal('me')).toEqual({ ok: false, error: '目前不能把換來的牌放進手牌' });
+
+    const auto = toReveal();
+    auto.setAIPlay('me', true);
+    expect(auto.gameView('me')!.deadline).toBeNull();
+    vi.advanceTimersByTime(1000);
+    expect(auto.match!.hand!.phase).not.toBe('passReveal');
+
+    const autoPlay = toReveal();
+    autoPlay.setAuto('me', true, false);
+    vi.advanceTimersByTime(1000);
+    expect(autoPlay.match!.hand!.phase).not.toBe('passReveal');
+  });
 });
 
 describe('回放檔', () => {

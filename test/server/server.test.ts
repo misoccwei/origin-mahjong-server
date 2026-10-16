@@ -447,7 +447,7 @@ describe('對局', () => {
     expect(c.userId).toBe('');
   });
 
-  it('回歸：換三張有交換時，亮牌階段送出換出與收到的牌，結束後仍保留', async () => {
+  it('回歸：換三張有交換時，亮牌階段送出換出與收到的牌，結束後仍保留（單人對 AI：亮牌不倒數，按放進手牌才繼續）', async () => {
     const host = await client('Z1');
     host.send({ t: 'createRoom', settings: { playerCount: 4, turnSeconds: 0, claimSeconds: 0, aiLevel: 'normal' } });
     await host.waitFor(() => host.room);
@@ -462,7 +462,8 @@ describe('對局', () => {
     expect(reveal.passSent).toEqual([...chosen].sort((a, b) => a - b));
     expect(reveal.passReceived).toHaveLength(3);
     expect(reveal.myHand).toHaveLength(10);
-    expect(reveal.deadline).toBeGreaterThan(0);
+    expect(reveal.deadline).toBeNull();
+    host.send({ t: 'passRevealDone' });
     const after = await host.waitFor(() => host.game?.phase !== 'passReveal' && host.game?.phase !== 'passThree' && host.game);
     expect(after.passSent).toEqual(reveal.passSent);
     expect(after.passReceived!.every((t) => after.myHand.includes(t) || host.room!.players[0].discards.some((d) => d.tile === t))).toBe(true);

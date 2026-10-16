@@ -459,6 +459,16 @@ export class Room {
     return ok;
   }
 
+  /** 單人對 AI：換三張亮牌不倒數，玩家按「放進手牌」才開始第一回合 */
+  confirmPassReveal(userId: string): RoomResult {
+    const seat = this.seatOf(userId);
+    const hand = this.match?.hand;
+    if (seat < 0 || !hand || this.status !== 'playing' || hand.phase !== 'passReveal' || !this.isSolo() || this.paused) return fail('目前不能把換來的牌放進手牌');
+    hand.completePassReveal();
+    this.afterChange();
+    return ok;
+  }
+
   /** 單人對 AI：自己的座位交給電腦代打（照正常速度，下一局也繼續），關掉後恢復自己打 */
   setAIPlay(userId: string, on: boolean): RoomResult {
     const seat = this.seatOf(userId);
@@ -630,6 +640,19 @@ export class Room {
       return;
     }
     if (hand.phase === 'passReveal') {
+      // 單人對 AI：不倒數，等玩家按「放進手牌」；電腦代打、快速打完或自動摸打時照 AI 的速度直接繼續
+      if (this.isSolo()) {
+        this.deadline = null;
+        const me = this.seats.findIndex((s) => !s?.isAI);
+        if (this.decidedByAI(me) || this.seats[me]!.autoPlay) {
+          this.later(this.fastFinish ? 0 : this.deps.aiDelayMs, () => {
+            if (this.paused || hand.phase !== 'passReveal') return;
+            hand.completePassReveal();
+            this.afterChange();
+          });
+        }
+        return;
+      }
       const wid = `${m.handIndex}:passReveal`;
       if (wid !== this.windowId) {
         this.windowId = wid;

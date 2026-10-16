@@ -10,7 +10,7 @@ import type { TileId, TileKind } from './tiles.js';
  * 伺服器與網頁版本不同時會在連線時提示（避免舊伺服器配新網頁而畫面壞掉）。
  * test/shared/protocol.test.ts 會在本檔的程式（註解除外）變動但版本沒改時失敗。
  */
-export const PROTOCOL_VERSION = 18;
+export const PROTOCOL_VERSION = 19;
 
 // ---- 遊戲行動 ----
 
@@ -232,6 +232,8 @@ export type ClientMessage =
   | { t: 'think' }
   /** 單人對 AI：自己的座位也交給 AI，快速打完這一局 */
   | { t: 'fastFinish' }
+  /** 單人對 AI：換三張亮牌不倒數，按「放進手牌」才繼續 */
+  | { t: 'passRevealDone' }
   /** 單人對 AI：自己的座位交給電腦代打（on = false 恢復自己打） */
   | { t: 'setAIPlay'; on: boolean }
   /** 取得等待中的房間列表 */
