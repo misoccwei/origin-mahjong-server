@@ -89,6 +89,8 @@ describe('身分與暱稱', () => {
 
   it('請求帶 rid 時，處理完（錯誤訊息、狀態推送都送出後）回 done；沒帶 rid 不回', async () => {
     const a = await client('Rid');
+    // 設定暱稱後伺服器會再推送一次狀態（登入時也有一次）；先等 nicknameOk 之後的那次到，才不會被算進第一個請求的回覆
+    await a.waitFor(() => a.messages.slice(a.messages.findIndex((m) => m.t === 'nicknameOk')).some((m) => m.t === 'state'));
     const sendRaw = (msg: object) => (a as unknown as { ws: { send: (s: string) => void } }).ws.send(JSON.stringify(msg));
     // 送出請求，回傳到 done 為止收到的訊息種類
     const req = async (msg: object, rid: number) => {
