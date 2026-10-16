@@ -82,7 +82,7 @@ src/client/
 - **效能**：AI（normal/hard）每一步都呼叫 `recommendYaku`；評估函式會被呼叫上千次，避免在裡面配置陣列或產生字串。`shantenStandard` 以 5 進位整數為快取 key。改了之後看 `simulation.test.ts` 的「4人困難 AI」時間（約 10 秒，明顯變慢要處理）。
 - **等伺服器回覆的按鈕**：用 `Busy.tsx` 的 `ReqButton`（`run` 回傳 `request()`／`act()` 的 Promise）或 `useRequest`；`request()` 會帶 `rid`，伺服器處理完回 `done`。等待中按鈕轉圈圈、其他請求按鈕點了沒作用。定時自動送的訊息（`listRooms`、語音 `rtc`）用 `send()`，不要用 `request()`（否則會一直擋住按鈕）。
 - **計時與測試**：`RoomDeps.resultMs` 只給測試用來縮短結算倒數；正式由 `settings.resultSeconds` 決定（0 = 等所有人按下一局）。
-- **單人對 AI**：只有一位真人、其餘全是 AI 時（`Room.isSolo()`）不限時、局結束公開 AI 手牌、可以「交給 AI 打完」（`fastFinish`）。測試要驗證限時、逾時或手牌遮蔽時，房間裡至少要有兩位真人（`server.test.ts` 的 `duoRoom`），否則會落入單人模式。
+- **單人對 AI**：只有一位真人、其餘全是 AI 時（`Room.isSolo()`）不限時（含結算不倒數）、局結束公開 AI 手牌、可以「交給 AI 打完」（`fastFinish`）。測試要驗證限時、逾時或手牌遮蔽時，房間裡至少要有兩位真人（`server.test.ts` 的 `duoRoom`），否則會落入單人模式。
 - **隨機座位預設開啟**：WebSocket 測試客戶端建立房間時預設送 `randomSeats: false`（`test/support/wsClient.ts`），測試要固定座位才不會亂。
 - **自動功能**：自動摸打、自動和牌只維持一局（`advanceHand` 會關掉）；不鳴牌（`noCall`）持續有效。自動和只在和牌分數達到這副聽牌的最高分（`winPreview().best`）時才自動，否則 `autoAction` 回傳 null 交給玩家；沒有時限的測試要用 `answerAutoStop` 替玩家回答。
 

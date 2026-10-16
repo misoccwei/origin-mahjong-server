@@ -581,7 +581,8 @@ export class Room {
       if (wid !== this.windowId) {
         this.windowId = wid;
         const ms = this.deps.resultMs ?? this.settings.resultSeconds * 1000;
-        this.deadline = ms > 0 ? Date.now() + ms : null;
+        // 單人對 AI：結算不倒數，等玩家按下一局
+        this.deadline = ms > 0 && !this.isSolo() ? Date.now() + ms : null;
       }
       const needAck = this.seats.map((_, i) => i).filter((i) => !this.isAISeat(i));
       if (needAck.every((i) => this.acks.has(i))) this.later(0, () => this.advanceHand());

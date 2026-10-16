@@ -59,11 +59,13 @@ describe('結算倒數', () => {
   beforeEach(() => vi.useFakeTimers());
 
   /** 1 位真人（開自動摸打）＋ 3 個 AI，跑到第一局結束 */
-  const playFirstHand = (resultSeconds: number) => {
+  const playFirstHand = (resultSeconds: number, twoHumans = false) => {
     const room = makeRoom({ resultSeconds, randomSeats: false, passThree: false, turnSeconds: 0, claimSeconds: 0 }, { aiDelayMs: 0, passRevealMs: 0, rng: seededRng(7) });
     room.join('me', '我');
-    for (let i = 0; i < 3; i++) room.addAI('me');
+    if (twoHumans) room.join('guest', '玩家'), room.setReady('guest', true);
+    while (room.seats.some((s) => !s)) room.addAI('me');
     room.start('me');
+    room.setAuto('guest', true, true);
     for (let i = 0; i < 5000 && room.match!.hand?.phase !== 'ended'; i++) {
       // 自動摸打只維持一局，而且遇到能槓、沒達最高分的和牌會停下來問：這裡每一步都重新打開，能和就和、能槓時直接摸切
       room.setAuto('me', true, true);
@@ -79,12 +81,19 @@ describe('結算倒數', () => {
     return room;
   };
 
-  it('依房間設定的秒數倒數，時間到自動進入下一局', () => {
-    const room = playFirstHand(20);
+  it('依房間設定的秒數倒數，時間到自動進入下一局（兩位以上真人）', () => {
+    const room = playFirstHand(20, true);
     vi.advanceTimersByTime(19_000);
     expect(room.match!.handIndex).toBe(0);
     vi.advanceTimersByTime(1_500);
     expect(room.match!.handIndex).toBe(1);
+  });
+
+  it('單人對 AI 時結算不倒數，等玩家按「下一局」', () => {
+    const room = playFirstHand(20);
+    expect(room.gameView('me')!.deadline).toBeNull();
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(room.match!.handIndex).toBe(0);
   });
 
   it('設為 0 時不倒數，等所有真人按「下一局」', () => {
