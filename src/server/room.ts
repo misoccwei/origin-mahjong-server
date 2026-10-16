@@ -559,14 +559,14 @@ export class Room {
     m.completeHand();
     this.acks.clear();
     this.shown.clear();
-    if (m.finished) this.status = 'finished';
-    else {
-      // 自動摸打與自動和牌只維持一局
-      for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false);
-      this.thought.clear();
-      this.fastFinish = false;
-      m.startHand();
-    }
+    // 長考與交給 AI 打完只管一局（整場結束也要清，否則加一圈後會沿用）
+    this.thought.clear();
+    this.fastFinish = false;
+    if (m.finished) {
+      this.status = 'finished';
+      // 電腦代打持續到整場結束：加一圈要重新打開
+      for (const s of this.seats) if (s) s.aiPlay = false;
+    } else m.startHand();
     this.afterChange();
   }
 
@@ -632,6 +632,8 @@ export class Room {
       const wid = `result:${m.handIndex}`;
       if (wid !== this.windowId) {
         this.windowId = wid;
+        // 自動摸打與自動和牌只維持一局：局一結束就關掉（最後一局後加一圈也不會沿用）
+        for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false);
         const ms = this.deps.resultMs ?? this.settings.resultSeconds * 1000;
         // 單人對 AI：結算不倒數，等玩家按下一局
         this.deadline = ms > 0 && !this.isSolo() ? Date.now() + ms : null;

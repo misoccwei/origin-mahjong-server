@@ -399,7 +399,8 @@ describe('對局', () => {
     await host.waitFor(() => host.room?.players[0].autoPlay);
     host.send({ t: 'start' });
     await host.waitFor(() => host.game?.phase === 'passReveal');
-    await host.waitFor(() => (answerAutoStop(host), host.game?.auto.on && host.game.phase === 'result'), 20000);
+    // 局一結束自動摸打就關掉
+    await host.waitFor(() => (answerAutoStop(host), host.game?.phase === 'result' && !host.game.auto.on), 20000);
   });
 
   it('電腦難度：只有房主能改，立即生效且不重設準備；牌局中也能改', async () => {

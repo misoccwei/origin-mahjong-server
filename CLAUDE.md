@@ -91,7 +91,7 @@ src/client/
 - **計時與測試**：`RoomDeps.resultMs` 只給測試用來縮短結算倒數；正式由 `settings.resultSeconds` 決定（0 = 等所有人按下一局）。
 - **單人對 AI**：只有一位真人、其餘全是 AI 時（`Room.isSolo()`）不限時（含結算、換三張亮牌都不倒數；亮牌要按「放進手牌」＝`passRevealDone`）、局結束公開 AI 手牌、可以「交給 AI 打完」（`fastFinish`，只管一局；每步不間隔、過程中不推送，打完才 notify）或「電腦代打」（`Seat.aiPlay`，照正常速度、持續到自己關掉）。測試要驗證限時、逾時或手牌遮蔽時，房間裡至少要有兩位真人（`server.test.ts` 的 `duoRoom`），否則會落入單人模式。
 - **隨機座位預設開啟**：WebSocket 測試客戶端建立房間時預設送 `randomSeats: false`（`test/support/wsClient.ts`），測試要固定座位才不會亂。
-- **自動功能**：自動摸打、自動和牌只維持一局（`advanceHand` 會關掉）；不鳴牌（`noCall`）持續有效。自動和只在和牌分數達到這副聽牌的最高分（`winPreview().best`）時才自動，否則 `autoAction` 回傳 null 交給玩家；沒有時限的測試要用 `answerAutoStop` 替玩家回答。
+- **自動功能**：自動摸打、自動和牌只維持一局（局一結束，`schedule` 進入結果時就關掉，所以最後一局後加一圈不會沿用）；`fastFinish` 在 `advanceHand` 清掉、電腦代打（`aiPlay`）整場結束時清掉；不鳴牌（`noCall`）持續有效。自動和只在和牌分數達到這副聽牌的最高分（`winPreview().best`）時才自動，否則 `autoAction` 回傳 null 交給玩家；沒有時限的測試要用 `answerAutoStop` 替玩家回答。
 
 ## 測試結構（對應 src）
 

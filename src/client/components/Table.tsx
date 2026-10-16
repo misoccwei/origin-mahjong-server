@@ -525,7 +525,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
       <ReqButton className={`chip-btn ${game.auto.win ? 'on' : ''}`} aria-pressed={game.auto.win} run={() => setAuto({ win: !game.auto.win })}>
         {t('自動和')}
       </ReqButton>
-      <ReqButton className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，下一局自動關閉')} run={() => setAuto({ on: !game.auto.on })}>
+      <ReqButton className={`chip-btn ${game.auto.on ? 'on' : ''}`} aria-pressed={game.auto.on} title={t('只維持這一局，局結束就自動關閉')} run={() => setAuto({ on: !game.auto.on })}>
         {t('自動打')}
       </ReqButton>
       <ReqButton className={`chip-btn ${game.auto.noCall ? 'on' : ''}`} aria-pressed={game.auto.noCall} title={t('別人打牌時不吃碰槓（自動略過，能和時仍會問你）；持續有效')} run={() => setAuto({ noCall: !game.auto.noCall })}>

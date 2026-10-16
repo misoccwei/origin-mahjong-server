@@ -216,6 +216,46 @@ describe('單人對 AI', () => {
   });
 });
 
+describe('自動功能只管一局', () => {
+  beforeEach(() => vi.useFakeTimers());
+
+  it('局一結束就關掉自動打、自動和；整場結束後加一圈，自動打、交給 AI 打完、電腦代打都不會沿用', () => {
+    const room = makeRoom({ ...defaultSettings(2), rounds: 1, randomSeats: false, passThree: false }, { aiDelayMs: 10, rng: seededRng(4) });
+    room.join('me', '我');
+    room.addAI('me');
+    room.start('me');
+    const finishHand = () => {
+      room.finishHandByAI('me');
+      for (let i = 0; i < 1000 && room.match!.hand?.phase !== 'ended'; i++) vi.advanceTimersByTime(1);
+      expect(room.match!.hand!.phase).toBe('ended');
+    };
+    finishHand();
+    room.nextHand('me');
+    vi.advanceTimersByTime(1);
+    // 最後一局：開著自動打、自動和、電腦代打打完
+    room.setAuto('me', true, true, true);
+    room.setAIPlay('me', true);
+    finishHand();
+    const g = room.gameView('me')!;
+    expect(g.auto).toEqual({ on: false, win: false, noCall: true });
+    room.nextHand('me');
+    vi.advanceTimersByTime(1);
+    expect(room.status).toBe('finished');
+    expect(room.extend('me')).toEqual({ ok: true });
+    const g3 = room.gameView('me')!;
+    expect(g3.handNo).toBe(3);
+    expect(g3.auto).toEqual({ on: false, win: false, noCall: true });
+    expect(g3.fastFinish).toBe(false);
+    expect(g3.aiPlay).toBe(false);
+    // 輪到自己時要自己打（不會被自動打掉）
+    for (let i = 0; i < 100 && !g3.pending && !room.gameView('me')!.pending; i++) vi.advanceTimersByTime(10);
+    const p = room.gameView('me')!.pending;
+    expect(p).not.toBeNull();
+    vi.advanceTimersByTime(60_000);
+    expect(room.gameView('me')!.pending).toEqual(p);
+  });
+});
+
 describe('回放檔', () => {
   beforeEach(() => vi.useFakeTimers());
 

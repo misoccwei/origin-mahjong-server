@@ -184,7 +184,7 @@ export const en: Record<string, string> = {
   '自動和': 'Auto win',
   '自動打': 'Autoplay',
   '不鳴牌': 'No calls',
-  '只維持這一局，下一局自動關閉': 'This hand only; turns off next hand',
+  '只維持這一局，局結束就自動關閉': 'This hand only; turns off when the hand ends',
   '放回手牌': 'Return to hand',
   '換出': 'Pass',
   '不換': 'Keep',

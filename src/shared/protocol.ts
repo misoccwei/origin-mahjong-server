@@ -144,7 +144,7 @@ export interface GameView {
   myWaitScore: { min: number; max: number } | null;
   /** 這一局還能按「長考」延長打牌時限（每局一次） */
   thinkAvailable: boolean;
-  /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者下一局都會自動關閉）、noCall = 不鳴牌（持續有效） */
+  /** 自己的自動設定：on = 自動摸打、win = 自動和牌（兩者局一結束就自動關閉）、noCall = 不鳴牌（持續有效） */
   auto: { on: boolean; win: boolean; noCall: boolean };
   result: HandResultView | null;
   /** 小牌限制：本輪是否還能和小牌 */
@@ -222,7 +222,7 @@ export type ClientMessage =
   | { t: 'ready'; ready: boolean }
   /** 房主開始牌局 */
   | { t: 'start' }
-  /** 自動摸打、自動和牌（下一局都會自動關閉；都只在和牌達到這副聽牌的最高分時自動和）；noCall = 不鳴牌（不吃碰槓，持續有效） */
+  /** 自動摸打、自動和牌（局一結束就自動關閉；都只在和牌達到這副聽牌的最高分時自動和）；noCall = 不鳴牌（不吃碰槓，持續有效） */
   | { t: 'setAuto'; on: boolean; win: boolean; noCall?: boolean }
   /** 房主調整電腦難度（等待中或牌局中皆可，立即生效） */
   | { t: 'setAILevel'; level: AILevel }
