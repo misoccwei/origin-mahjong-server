@@ -55,6 +55,7 @@ src/client/
   components/Table.tsx      牌桌（直式／橫式兩種版面）、操作按鈕、提示、推薦牌型面板、局結果（ResultBody 可重用）
   components/RoomScreens.tsx 等待房間、最終結算（含重看各局 ReplayModal）、各局紀錄
   components/Lobby.tsx      暱稱、大廳、規則設定表單 SettingsForm、LangSelect
+  components/Replay.tsx     回放頁面（#replay 路由、選擇檔案、播放控制；轉成 RoomView/GameView 交給 Table.tsx 的 Board，faceUp 讓手牌正面朝上）
   exportImage.ts   結算畫面用 canvas 畫成 PNG（手機分享、電腦下載）
   voice.ts / components/Voice.tsx  WebRTC 語音
 ```
@@ -98,7 +99,7 @@ src/client/
 test/shared/        scoring、settlement、rules、recommend、recommendShape、outcome、yakuInfo、protocol、replay（格式版本、讀取、範例檔）
 test/server/engine/ hand（指定牌山情境）、match、ai（AI 決策與 autoAction）、simulation（AI 整場模擬，慢）
 test/server/        room（Room 單元測試，vi.useFakeTimers＋固定亂數）、server（WebSocket 整合）、replay（回放紀錄重現每一步）
-test/client/        table、result、screens、yakuTable、i18n（伺服器渲染快照）
+test/client/        table、result、screens、yakuTable、replay、i18n（伺服器渲染快照）
 test/fixtures/      每一版回放檔格式的範例檔
 test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/makeHand/autoplayUntil/seededRng/playMatch）、
                     wsClient（Client、newKey、waitMyTurn、answerAutoStop）、snapshots（room()/game()/player()/render()/text()/appState()）、i18nKeys
@@ -140,3 +141,4 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 等待伺服器回覆（轉圈圈、防連點） | net.ts `request`、components/Busy.tsx、server.ts `done` |
 | 單人對 AI（不限時、公開 AI 手牌、交給 AI 打完這一局） | room.ts `isSolo`/`finishHandByAI`/`decidedByAI`、Table.tsx `FastFinish` |
 | 斷線暫停、AI 代打 | room.ts `updatePause`/`decide` |
+| 牌局回放（#replay 回放頁面） | replaySchema.ts、replay.ts（shared／server）、hand.ts `replayLog`、room.ts `replayFile`、Replay.tsx |

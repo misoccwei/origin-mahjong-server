@@ -68,19 +68,36 @@ function River({ p, lastDiscard, pointKind }: { p: PlayerView; lastDiscard: Game
 }
 
 /** 一位玩家在牌桌上的那一側：以「自己在下方」的方向排版，再依位置整層旋轉（門風與分數在四角的名牌裡） */
-function Side({ p, n, game, pos, pointKind, showHand }: { p: PlayerView; n: number; game: GameView; pos: Pos; pointKind: TileKind | null; showHand: boolean }) {
+function Side({ p, n, game, pos, pointKind, showHand, faceUp }: {
+  p: PlayerView;
+  n: number;
+  game: GameView;
+  pos: Pos;
+  pointKind: TileKind | null;
+  showHand: boolean;
+  /** 回放：手牌正面朝上 */
+  faceUp?: FaceUpHand;
+}) {
   return (
     <div className={`side pos-${pos}`}>
       <River p={p} lastDiscard={game.lastDiscard} pointKind={pointKind} />
       {showHand && (
-        <div className="side-hand">
-          {Array.from({ length: p.handCount - (p.hasDrawn ? 1 : 0) }, (_, i) => (
-            <Tile key={i} back />
-          ))}
-          {p.hasDrawn && (
-            <span className="drawn-gap">
-              <Tile back />
-            </span>
+        <div className={faceUp ? 'side-hand face-up' : 'side-hand'}>
+          {faceUp
+            ? faceUp.hand.map((t) => <Tile key={t} tile={t} />)
+            : Array.from({ length: p.handCount - (p.hasDrawn ? 1 : 0) }, (_, i) => <Tile key={i} back />)}
+          {faceUp ? (
+            faceUp.drawn !== null && (
+              <span className="drawn-gap">
+                <Tile tile={faceUp.drawn} />
+              </span>
+            )
+          ) : (
+            p.hasDrawn && (
+              <span className="drawn-gap">
+                <Tile back />
+              </span>
+            )
           )}
           {p.melds.map((m, i) => (
             <MeldView key={i} meld={m} seat={p.seat} n={n} pointKind={pointKind} />
@@ -1144,7 +1161,7 @@ function InfoCard({ room, game, tab, setTab, hint }: { room: RoomView; game: Gam
 }
 
 /** 橫式（寬大於高）時，手牌在下、牌桌置中、兩側放工具與面板 */
-function useLandscape() {
+export function useLandscape() {
   const query = '(min-aspect-ratio: 5/4)';
   const [landscape, setLandscape] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
   useEffect(() => {
@@ -1157,7 +1174,13 @@ function useLandscape() {
   return !!landscape;
 }
 
-function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = true, view = 0 }: {
+/** 回放時正面朝上的手牌（不含剛摸到的牌）與剛摸到的牌 */
+export interface FaceUpHand {
+  hand: TileId[];
+  drawn: TileId | null;
+}
+
+export function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = true, view = 0, faceUp }: {
   room: RoomView;
   game: GameView;
   now: number;
@@ -1169,6 +1192,8 @@ function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = 
   view?: number;
   /** 直式時換三張紀錄改放在上方資訊卡，牌桌上不顯示 */
   swapMini?: boolean;
+  /** 回放：各座位的手牌正面朝上 */
+  faceUp?: FaceUpHand[];
 }) {
   // 觀戰者沒有座位：以 view 為下方的視角，下方玩家的手牌也以牌背顯示
   const spectating = room.mySeat === null;
@@ -1182,7 +1207,7 @@ function Board({ room, game, now, pointKind, overlay, discardButton, swapMini = 
       {spectating ? null : game.phase === 'passReveal' ? <SwapReveal game={game} now={now} /> : swapMini && game.phase !== 'passThree' && <SwapMini game={game} />}
       {room.players.map((p) => {
         const pos = positionOf(p.seat, me, n);
-        return <Side key={p.seat} p={p} n={n} game={game} pos={pos} pointKind={pointKind} showHand={spectating || pos !== 'bottom'} />;
+        return <Side key={p.seat} p={p} n={n} game={game} pos={pos} pointKind={pointKind} showHand={spectating || pos !== 'bottom'} faceUp={faceUp?.[p.seat]} />;
       })}
       {room.players.map((p) => (
         <NamePlate key={p.seat} p={p} room={room} game={game} pos={positionOf(p.seat, me, n)} />

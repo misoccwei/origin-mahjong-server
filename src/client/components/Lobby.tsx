@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AILevelSelect, NumInput } from './Inputs.js';
 import { YakuTable } from './YakuTable.js';
+import { openReplay } from './Replay.js';
 import { DEFAULT_ROUNDS, defaultSettings, type RuleSettings } from '../../shared/rules.js';
 import { BusyVeil, ReqButton, useRequest } from './Busy.js';
 import { request, send, type AppState } from '../net.js';
@@ -43,6 +44,9 @@ export function NicknameScreen({ state }: { state: AppState }) {
         </button>
       </form>
       <p className="muted small">{t('使用者代碼：{id}', { id: state.userId?.slice(0, 8) ?? '' })}</p>
+      <p className="muted small">
+        <button className="link" onClick={() => openReplay(null)}>{t('看別人分享的牌局回放')}</button>
+      </p>
       <LangSelect />
     </div>
   );
@@ -241,6 +245,11 @@ export function LobbyScreen({ state }: { state: AppState }) {
         <ReqButton className="primary" run={() => request({ t: 'createRoom', settings })}>
           {t('建立房間')}
         </ReqButton>
+      </div>
+      <div className="panel">
+        <h2>{t('牌局回放')}</h2>
+        <p className="muted small">{t('打開別人分享的回放檔（牌局結束時可以在結算畫面儲存），一步一步重看整場牌局。')}</p>
+        <button onClick={() => openReplay(null)}>{t('開啟回放檔')}</button>
       </div>
       <div className="panel wide">
         <h2>{t('牌型表')}</h2>

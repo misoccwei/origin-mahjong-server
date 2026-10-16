@@ -549,3 +549,20 @@ table.yaku tr.total td { font-weight: 700; border-top: 2px solid #ccc; }
 .history tr.replayable { cursor: pointer; }
 .history tr.replayable:hover td { background: rgba(212, 160, 23, 0.12); }
 .history tr.replayable td:first-child { color: #2a6fb0; text-decoration: underline; }
+
+/* ---- 牌局回放 ---- */
+.replay-controls { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 8px 10px; }
+.table.portrait .replay-controls { flex-wrap: nowrap; }
+.replay-row { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.replay-row select { min-height: 34px; max-width: 100%; }
+.replay-caption { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; color: #fff; font-weight: 600; }
+.replay-seek { width: 100%; accent-color: var(--gold); }
+.gutter .replay-caption { flex-direction: column; gap: 2px; }
+.table.replay .top-bar .badge { margin: 0; }
+.drop-zone {
+  display: grid; place-items: center; gap: 8px; padding: 24px 12px; margin: 8px 0;
+  border: 2px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; cursor: pointer; text-align: center;
+}
+.drop-zone.on { border-color: var(--gold); background: rgba(212, 160, 23, 0.1); }
+.drop-zone input { max-width: 100%; }
+.error { color: var(--neg); }

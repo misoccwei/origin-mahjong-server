@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 import { LobbyScreen } from '../../src/client/components/Lobby.js';
 import { FinalScreen, WaitingRoom } from '../../src/client/components/RoomScreens.js';
@@ -6,6 +7,8 @@ import { YakuTable } from '../../src/client/components/YakuTable.js';
 import { appState, game, player, render, room, text } from '../support/snapshots.js';
 import { DICTS, playerName, setLang, t, tileLabel, tn, windShort } from '../../src/client/i18n/index.js';
 import { allKeys } from '../support/i18nKeys.js';
+import { ReplayScreen } from '../../src/client/components/Replay.js';
+import { anonymizeReplay, parseReplay } from '../../src/shared/replay.js';
 
 afterEach(() => setLang('zh'));
 
@@ -89,11 +92,14 @@ describe('多國語言', () => {
       spectator: render(room({ players, mySeat: null }), game({ myHand: [] })),
       final: renderToString(<FinalScreen room={finished} />),
       yaku: renderToString(<YakuTable advanced expansion />),
+      replayPicker: renderToString(<ReplayScreen file={null} />),
+      replay: renderToString(<ReplayScreen file={anonymizeReplay(parseReplay(readFileSync(new URL('../fixtures/replay-v1.json', import.meta.url), 'utf8')))} />),
     };
     expect(text(screens.turn)).toContain('Your turn');
     expect(text(screens.claim)).toContain('Pon');
     expect(text(screens.result)).toContain('Half Flush');
     expect(text(screens.final)).toContain('AI 1 won off Me 40 pts Half Flush');
+    expect(text(screens.replay)).toContain('Player 1');
     for (const [name, html] of Object.entries(screens)) {
       // 語言選單本來就用各語言自己的名字（繁體中文、日本語）
       const visible = text(html.replace(/<select aria-label="Language"[\s\S]*?<\/select>/g, ''));
