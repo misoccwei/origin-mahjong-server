@@ -39,13 +39,13 @@ function positionOf(seat: number, me: number, n: number): Pos {
   return (['bottom', 'left', 'top', 'right'] as const)[rel];
 }
 
-function MeldView({ meld, seat, n, small }: { meld: Meld; seat: number; n: number; small?: boolean }) {
+function MeldView({ meld, seat, n, small, pointKind = null }: { meld: Meld; seat: number; n: number; small?: boolean; pointKind?: TileKind | null }) {
   const hidden = meld.tiles[0] === -1;
   return (
     <span className="meld">
       {meldTileOrder(meld, seat, n).map((t, i) => {
         const faceDown = hidden || (meld.type === 'ankan' && (i === 0 || i === 3));
-        return <Tile key={i} tile={t} back={faceDown} small={small} sideways={t === meld.calledTile} />;
+        return <Tile key={i} tile={t} back={faceDown} small={small} sideways={t === meld.calledTile} match={!faceDown && pointKind !== null && kindOf(t) === pointKind} />;
       })}
     </span>
   );
@@ -83,7 +83,7 @@ function Side({ p, n, game, pos, pointKind, showHand }: { p: PlayerView; n: numb
             </span>
           )}
           {p.melds.map((m, i) => (
-            <MeldView key={i} meld={m} seat={p.seat} n={n} />
+            <MeldView key={i} meld={m} seat={p.seat} n={n} pointKind={pointKind} />
           ))}
         </div>
       )}
@@ -459,7 +459,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
     me.melds.length > 0 ? (
       <div className="meld-area">
         {me.melds.map((m, i) => (
-          <MeldView key={i} meld={m} seat={me.seat} n={room.players.length} />
+          <MeldView key={i} meld={m} seat={me.seat} n={room.players.length} pointKind={pointKind} />
         ))}
       </div>
     ) : null;
