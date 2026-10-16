@@ -358,7 +358,8 @@ export async function saveFile(file: File) {
   const mobile = window.matchMedia?.('(pointer: coarse)').matches;
   if (mobile && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: filename });
+      // 只分享檔案：帶 title／text 的話，LINE 等 App 會多送一則檔名文字訊息
+      await navigator.share({ files: [file] });
       return;
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
