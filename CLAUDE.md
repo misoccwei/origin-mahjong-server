@@ -64,7 +64,7 @@ src/client/
 
 ## 必須遵守的慣例與陷阱
 
-- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**19**。
+- **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**20**。
 - **回放檔格式**：分享出去的檔案會留很久。`replaySchema.ts` 的程式（註解除外）一改，`test/shared/replay.test.ts` 就會失敗：
   把 `REPLAY_SCHEMA_VERSION` 加一、在 `replay.ts` 的 `MIGRATIONS` 寫舊版 → 新版的轉換、放新版範例檔 `test/fixtures/replay-vN.json`（舊的保留），再更新 `RECORDED`。
   回放只記事件、不重跑規則，所以改規則／計分／AI／協定**不必**動回放版本；但引擎新增會改變牌桌的動作時，要在 `hand.ts` 推進 `replayLog`、在 `replayFrame` 處理（`test/server/replay.test.ts` 會檢查每一步牌數守恆、播完與局結果一致）。
@@ -89,7 +89,7 @@ src/client/
 - **效能**：AI（normal/hard）每一步都呼叫 `recommendYaku`；評估函式會被呼叫上千次，避免在裡面配置陣列或產生字串。`shantenStandard` 以 5 進位整數為快取 key。改了之後看 `simulation.test.ts` 的「4人困難 AI」時間（約 10 秒，明顯變慢要處理）。
 - **等伺服器回覆的按鈕**：用 `Busy.tsx` 的 `ReqButton`（`run` 回傳 `request()`／`act()` 的 Promise）或 `useRequest`；`request()` 會帶 `rid`，伺服器處理完回 `done`。等待中按鈕轉圈圈、其他請求按鈕點了沒作用。定時自動送的訊息（`listRooms`、語音 `rtc`）用 `send()`，不要用 `request()`（否則會一直擋住按鈕）。
 - **計時與測試**：`RoomDeps.resultMs` 只給測試用來縮短結算倒數；正式由 `settings.resultSeconds` 決定（0 = 等所有人按下一局）。
-- **單人對 AI**：只有一位真人、其餘全是 AI 時（`Room.isSolo()`）不限時（含結算、換三張亮牌都不倒數；亮牌要按「放進手牌」＝`passRevealDone`）、局結束公開 AI 手牌、可以「交給 AI 打完」（`fastFinish`，只管一局；每步不間隔、過程中不推送，打完才 notify）或「電腦代打」（`Seat.aiPlay`，照正常速度、持續到自己關掉）。測試要驗證限時、逾時或手牌遮蔽時，房間裡至少要有兩位真人（`server.test.ts` 的 `duoRoom`），否則會落入單人模式。
+- **單人對 AI**：只有一位真人、其餘全是 AI 時（`Room.isSolo()`）不限時（含結算不倒數；換三張亮牌照常倒數 3 秒）、局結束公開 AI 手牌、可以「交給 AI 打完」（`fastFinish`，只管一局；每步不間隔、過程中不推送，打完才 notify）或「電腦代打」（`Seat.aiPlay`，照正常速度、持續到自己關掉）。測試要驗證限時、逾時或手牌遮蔽時，房間裡至少要有兩位真人（`server.test.ts` 的 `duoRoom`），否則會落入單人模式。
 - **隨機座位預設開啟**：WebSocket 測試客戶端建立房間時預設送 `randomSeats: false`（`test/support/wsClient.ts`），測試要固定座位才不會亂。
 - **自動功能**：自動摸打、自動和牌只維持一局（局一結束，`schedule` 進入結果時就關掉，所以最後一局後加一圈不會沿用）；`fastFinish` 在 `advanceHand` 清掉、電腦代打（`aiPlay`）整場結束時清掉；不鳴牌（`noCall`）持續有效。自動和只在和牌分數達到這副聽牌的最高分（`winPreview().best`）時才自動，否則 `autoAction` 回傳 null 交給玩家；沒有時限的測試要用 `answerAutoStop` 替玩家回答。
 

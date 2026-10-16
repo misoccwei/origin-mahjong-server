@@ -595,8 +595,4 @@ export const en: Record<string, string> = {
   '改回自己打': 'Take over',
   '目前由電腦代打': 'The computer is playing for you',
   '只有一個人對電腦時才能交給電腦代打': 'The computer can only play for you when you are the only human player',
-  '放進手牌': 'Add to hand',
-  '繼續': 'Continue',
-  '收到換來的 3 張牌，按「放進手牌」繼續': 'You received 3 tiles. Press "Add to hand" to continue',
-  '目前不能把換來的牌放進手牌': 'The passed tiles cannot be added to your hand now',
 };

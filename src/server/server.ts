@@ -220,8 +220,6 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         return reply(c, room.think(userId));
       case 'fastFinish':
         return reply(c, room.finishHandByAI(userId));
-      case 'passRevealDone':
-        return reply(c, room.confirmPassReveal(userId));
       case 'setAIPlay':
         return reply(c, room.setAIPlay(userId, !!msg.on));
       case 'setAuto':

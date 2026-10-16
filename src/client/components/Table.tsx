@@ -458,13 +458,7 @@ function useMyArea({ room, game, onPoint, showReco, toggleReco, landscape }: {
         {shownHint && pointKind !== null ? (
           <DiscardWaits room={room} game={game} discard={pointKind} waits={shownHint} />
         ) : game.phase === 'passReveal' ? (
-          game.solo ? (
-            game.passReceived ? t('收到換來的 3 張牌，按「放進手牌」繼續') : t('這次沒有換到牌')
-          ) : game.passReceived ? (
-            t('收到換來的 3 張牌，倒數結束後放進手牌')
-          ) : (
-            t('這次沒有換到牌')
-          )
+          game.passReceived ? t('收到換來的 3 張牌，倒數結束後放進手牌') : t('這次沒有換到牌')
         ) : game.myWaits.length > 0 ? (
           <Waits room={room} game={game} />
         ) : p?.kind === 'turn' ? (
@@ -606,12 +600,6 @@ function SwapReveal({ game, now }: { game: GameView; now: number }) {
         <div className="swap-count" key={remain}>
           {remain > 0 ? remain : ''}
         </div>
-      )}
-      {/* 單人對 AI：不倒數，自己按（電腦代打、自動摸打時伺服器會自動繼續） */}
-      {game.solo && remain === null && !game.aiPlay && !game.fastFinish && !game.auto.on && (
-        <ReqButton className="primary" run={() => request({ t: 'passRevealDone' })}>
-          {game.passReceived ? t('放進手牌') : t('繼續')}
-        </ReqButton>
       )}
     </div>
   );
