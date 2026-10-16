@@ -174,7 +174,7 @@ export const en: Record<string, string> = {
   '點手牌把要換出的牌放進候選格，點候選格可以放回手牌': 'Tap tiles to put them in the pass slots; tap a slot to return it',
   '這一局只能用一次': 'Once per hand',
   'AI 打完中…': 'AI finishing…',
-  '這一局交給 AI 快速打完？下一局恢復自己打。': "Let AI quickly finish this hand? You'll play again from the next hand.",
+  '這一局交給 AI 瞬間打完，直接看結果？下一局恢復自己打。': "Let AI finish this hand instantly and show the result? You'll play again from the next hand.",
   '交給 AI 打完': 'Let AI finish',
   '這一局已經交給 AI 打完': 'AI is finishing this hand',
   '只有一個人對電腦時才能交給 AI 打完': 'Only available when playing alone against AI',

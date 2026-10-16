@@ -115,8 +115,8 @@ describe('單人對 AI', () => {
   beforeEach(() => vi.useFakeTimers());
 
   /** humans 位真人（me、guest…）＋其餘 AI，開始牌局 */
-  const setup = (humans = 1) => {
-    const room = makeRoom({ randomSeats: false, passThree: false, turnSeconds: 20, claimSeconds: 10 }, { aiDelayMs: 1000, rng: seededRng(3) });
+  const setup = (humans = 1, notify: RoomDeps['notify'] = () => {}) => {
+    const room = makeRoom({ randomSeats: false, passThree: false, turnSeconds: 20, claimSeconds: 10 }, { aiDelayMs: 1000, rng: seededRng(3), notify });
     room.join('me', '我');
     if (humans > 1) room.join('guest', '玩家'), room.setReady('guest', true);
     while (room.seats.some((s) => !s)) room.addAI('me');
@@ -137,16 +137,21 @@ describe('單人對 AI', () => {
     expect(duo.finishHandByAI('me')).toEqual({ ok: false, error: '只有一個人對電腦時才能交給 AI 打完' });
   });
 
-  it('交給 AI 快速打完這一局：自己不能再操作，局結束公開 AI 的手牌，下一局恢復', () => {
-    const room = setup();
+  it('交給 AI 瞬間打完這一局：自己不能再操作，過程中不推送，局結束公開 AI 的手牌，下一局恢復', () => {
+    let pushes = 0;
+    const room = setup(1, () => pushes++);
+    pushes = 0;
     expect(room.finishHandByAI('me')).toEqual({ ok: true });
+    expect(pushes).toBe(1);
     const g = room.gameView('me')!;
     expect(g.fastFinish).toBe(true);
     expect(g.pending).toBeNull();
     expect(room.action('me', 1, { type: 'pass' })).toEqual({ ok: false, error: '這一局已經交給 AI 打完' });
-    // 每一步只等 20 毫秒（AI 平常要 1 秒）
-    for (let i = 0; i < 1000 && room.match!.hand!.phase !== 'ended'; i++) vi.advanceTimersByTime(20);
+    // 每一步不間隔（AI 平常要 1 秒）：只等計時器的最短間隔（1 毫秒）
+    for (let i = 0; i < 1000 && room.match!.hand!.phase !== 'ended'; i++) vi.advanceTimersByTime(1);
     expect(room.match!.hand!.phase).toBe('ended');
+    // 只推送開始時（AI 打完中）與打完時（局結果）
+    expect(pushes).toBe(2);
     const r = room.gameView('me')!.result!;
     for (const s of [1, 2, 3]) expect(r.hands[s].length).toBeGreaterThan(0);
     room.nextHand('me');

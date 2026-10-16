@@ -230,7 +230,7 @@ export type ClientMessage =
   | { t: 'showHand' }
   /** 長考：自己的回合延長打牌時限 60 秒（每局一次） */
   | { t: 'think' }
-  /** 單人對 AI：自己的座位也交給 AI，快速打完這一局 */
+  /** 單人對 AI：自己的座位也交給 AI，瞬間打完這一局 */
   | { t: 'fastFinish' }
   /** 單人對 AI：換三張亮牌不倒數，按「放進手牌」才繼續 */
   | { t: 'passRevealDone' }

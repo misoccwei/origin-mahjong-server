@@ -1112,12 +1112,12 @@ function PauseOverlay({ room }: { room: RoomView }) {
   );
 }
 
-/** 單人對 AI：把這一局交給 AI 快速打完（下一局恢復自己打） */
+/** 單人對 AI：把這一局交給 AI 瞬間打完（下一局恢復自己打） */
 function FastFinish({ game }: { game: GameView }) {
   if (!game.solo || game.phase === 'result') return null;
   if (game.fastFinish) return <span className="badge ai fast-finish">{t('AI 打完中…')}</span>;
   return (
-    <ReqButton className="chip-btn fast-finish" run={() => confirm(t('這一局交給 AI 快速打完？下一局恢復自己打。')) && request({ t: 'fastFinish' })}>
+    <ReqButton className="chip-btn fast-finish" run={() => confirm(t('這一局交給 AI 瞬間打完，直接看結果？下一局恢復自己打。')) && request({ t: 'fastFinish' })}>
       {t('交給 AI 打完')}
     </ReqButton>
   );

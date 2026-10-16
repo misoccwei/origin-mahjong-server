@@ -50,8 +50,6 @@ const ok: RoomResult = { ok: true };
 const fail = (error: string): RoomResult => ({ ok: false, error });
 /** 他人的暗槓：牌以 -1 遮蔽 */
 const maskAnkan = (melds: Meld[]): Meld[] => melds.map((m) => (m.type === 'ankan' ? { ...m, tiles: m.tiles.map(() => -1) } : m));
-/** 交給 AI 快速打完一局時，每一步之間的間隔 */
-const FAST_FINISH_MS = 20;
 
 export class Room {
   readonly id: string;
@@ -479,7 +477,7 @@ export class Room {
     return ok;
   }
 
-  /** 單人對 AI：自己的座位也交給 AI，快速打完這一局（下一局恢復自己打） */
+  /** 單人對 AI：自己的座位也交給 AI，瞬間打完這一局直接看結果（下一局恢復自己打） */
   finishHandByAI(userId: string): RoomResult {
     const seat = this.seatOf(userId);
     const hand = this.match?.hand;
@@ -488,6 +486,8 @@ export class Room {
     if (this.paused) return fail('牌局暫停中');
     this.fastFinish = true;
     this.afterChange();
+    // 先推送一次，畫面顯示「AI 打完中…」
+    this.deps.notify(this.audienceIds());
     return ok;
   }
 
@@ -614,6 +614,8 @@ export class Room {
       if (this.match) this.match.hand = null;
     }
     this.schedule();
+    // 交給 AI 打完：打的過程不推送，打完直接送出局結果
+    if (this.fastFinish && this.match?.hand && this.match.hand.phase !== 'ended') return;
     this.deps.notify(this.audienceIds());
   }
 
@@ -680,7 +682,8 @@ export class Room {
       this.deadline = secs > 0 ? Date.now() + secs * 1000 : null;
     }
     let humanPending = false;
-    const aiDelay = this.fastFinish ? Math.min(this.deps.aiDelayMs, FAST_FINISH_MS) : this.deps.aiDelayMs;
+    // 交給 AI 打完：每一步不間隔（仍以計時器一步一步跑，不會整段卡住伺服器）
+    const aiDelay = this.fastFinish ? 0 : this.deps.aiDelayMs;
     for (const seat of pendingSeats) {
       if (this.decidedByAI(seat)) {
         this.later(aiDelay, () => this.runAI(seat, wid));
