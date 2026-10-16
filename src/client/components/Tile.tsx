@@ -10,6 +10,19 @@ export function faceUrl(k: TileKind) {
   return `/tiles/${name}.svg`;
 }
 
+const preloaded: HTMLImageElement[] = [];
+
+/** 預先載入所有牌面與底圖，牌第一次出現時不會先露出空白的白色牌 */
+export function preloadTiles() {
+  if (preloaded.length > 0 || typeof Image === 'undefined') return;
+  const urls = ['/tiles/Front.svg', '/tiles/Back.svg', ...Array.from({ length: 34 }, (_, k) => faceUrl(k))];
+  for (const u of urls) {
+    const img = new Image();
+    img.src = u;
+    preloaded.push(img);
+  }
+}
+
 interface Props {
   tile?: TileId;
   kind?: TileKind;
