@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { PROTOCOL_VERSION, type ClientMessage, type ClientRequest, type RtcSignal, type GameAction, type GameView, type RoomSummary, type RoomView, type ServerMessage } from '../shared/protocol.js';
+import type { ReplayFile } from '../shared/replaySchema.js';
 import { signChallenge } from './identity.js';
 import { t } from './i18n/index.js';
 
@@ -107,6 +108,9 @@ export function connect() {
       case 'roomList':
         set({ roomList: msg.rooms });
         break;
+      case 'replay':
+        replayWaiter?.(msg.replay);
+        break;
       case 'done':
         finish(msg.rid);
         break;
@@ -158,6 +162,17 @@ export function request(msg: ClientMessage): Promise<void> {
     waiting.set(rid, { t: msg.t, resolve, timer: setTimeout(() => finish(rid), REQUEST_TIMEOUT_MS) });
     set({ pending: [...waiting.values()].map((x) => x.t) });
   });
+}
+
+let replayWaiter: ((f: ReplayFile) => void) | null = null;
+
+/** 牌局結束後向伺服器拿整場的回放檔；拿不到（錯誤訊息已經以 toast 顯示）時為 null */
+export async function fetchReplay(): Promise<ReplayFile | null> {
+  let got: ReplayFile | null = null;
+  replayWaiter = (f) => (got = f);
+  await request({ t: 'getReplay' });
+  replayWaiter = null;
+  return got;
 }
 
 export function act(action: GameAction): Promise<void> {

@@ -141,4 +141,4 @@ test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/m
 | 等待伺服器回覆（轉圈圈、防連點） | net.ts `request`、components/Busy.tsx、server.ts `done` |
 | 單人對 AI（不限時、公開 AI 手牌、交給 AI 打完這一局） | room.ts `isSolo`/`finishHandByAI`/`decidedByAI`、Table.tsx `FastFinish` |
 | 斷線暫停、AI 代打 | room.ts `updatePause`/`decide` |
-| 牌局回放（#replay 回放頁面） | replaySchema.ts、replay.ts（shared／server）、hand.ts `replayLog`、room.ts `replayFile`、Replay.tsx |
+| 牌局回放（儲存回放檔、#replay 回放頁面） | replaySchema.ts、replay.ts（shared／server）、hand.ts `replayLog`、room.ts `replayFile`、RoomScreens.tsx `SaveReplay`、Replay.tsx |

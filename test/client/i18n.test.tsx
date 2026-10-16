@@ -81,6 +81,7 @@ describe('多國語言', () => {
     const finished = room({
       players,
       status: 'finished',
+      replays: [{ handNo: 1, result: result.result! }],
       history: [{ handNo: 1, startSeat: 0, kind: 'win', winners: [{ seat: 1, total: 40, tsumo: false, from: 0, yaku: ['混一色'] }], deltas: [-40, 40, 0, 0] }],
     });
     const screens = {
@@ -99,6 +100,7 @@ describe('多國語言', () => {
     expect(text(screens.claim)).toContain('Pon');
     expect(text(screens.result)).toContain('Half Flush');
     expect(text(screens.final)).toContain('AI 1 won off Me 40 pts Half Flush');
+    expect(text(screens.final)).toContain('Save replay file');
     expect(text(screens.replay)).toContain('Player 1');
     for (const [name, html] of Object.entries(screens)) {
       // 語言選單本來就用各語言自己的名字（繁體中文、日本語）

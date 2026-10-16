@@ -348,7 +348,13 @@ function fitTo(p: Painter, s: string, max: number) {
 export async function saveCanvas(canvas: HTMLCanvasElement, filename: string) {
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   if (!blob) throw new Error(t('無法產生圖片'));
-  const file = new File([blob], filename, { type: 'image/png' });
+  await saveFile(new File([blob], filename, { type: 'image/png' }));
+}
+
+/** 存檔：手機（可分享檔案時）用系統分享（可以直接傳到 LINE、存到相簿），其他情況直接下載 */
+export async function saveFile(file: File) {
+  const filename = file.name;
+  const blob = file;
   const mobile = window.matchMedia?.('(pointer: coarse)').matches;
   if (mobile && navigator.canShare?.({ files: [file] })) {
     try {

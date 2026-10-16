@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { RoomView } from '../../shared/protocol.js';
 import type { RuleSettings } from '../../shared/rules.js';
-import { request, send, toast } from '../net.js';
+import { fetchReplay, request, send, toast } from '../net.js';
+import { anonymizeReplay } from '../../shared/replay.js';
+import type { ReplayFile } from '../../shared/replaySchema.js';
 import { ReqButton } from './Busy.js';
 import { aiLevelLabel, AILevelSelect } from './Inputs.js';
 import { LangSelect, SettingsForm } from './Lobby.js';
 import { playerName, t, tn } from '../i18n/index.js';
 import { VoicePanel } from './Voice.js';
 import { ExportButton } from './ExportButton.js';
-import { renderFinal, renderHandResult } from '../exportImage.js';
+import { renderFinal, renderHandResult, saveFile } from '../exportImage.js';
+import { openReplay } from './Replay.js';
 import { ResultBody } from './Table.js';
 
 function rulesSummary(s: RuleSettings) {
@@ -168,10 +171,58 @@ export function FinalScreen({ room }: { room: RoomView }) {
         </div>
         <SpectatorList room={room} />
       </div>
+      {room.replays.length > 0 && <SaveReplay room={room} />}
       <div className="panel">
         <h2>{t('各局紀錄')}</h2>
         {room.replays.length > 0 && <p className="muted small">{t('點一局可以重看那一局的結果。')}</p>}
         <HistoryTable room={room} />
+      </div>
+    </div>
+  );
+}
+
+/** 儲存整場的回放檔（可選匿名），或直接在這裡打開回放頁面 */
+function SaveReplay({ room }: { room: RoomView }) {
+  const [anonymous, setAnonymous] = useState(false);
+  const get = async (): Promise<ReplayFile | null> => {
+    const f = await fetchReplay();
+    return f && anonymous ? anonymizeReplay(f) : f;
+  };
+  return (
+    <div className="panel">
+      <h2>{t('牌局回放')}</h2>
+      <p className="muted small">{t('儲存整場牌局的回放檔（包含每一家的手牌），傳給別人後可以在「開啟回放檔」一步一步重看。')}</p>
+      <label className="check">
+        <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+        {t('匿名（真人玩家的名字改成「玩家 N」）')}
+      </label>
+      <div className="row">
+        <ReqButton
+          className="primary"
+          run={async () => {
+            const f = await get();
+            if (!f) return;
+            const d = new Date(f.savedAt);
+            const pad = (x: number) => String(x).padStart(2, '0');
+            const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+            const file = new File([JSON.stringify(f)], `mahjong-replay-${room.id}-${stamp}.json`, { type: 'application/json' });
+            try {
+              await saveFile(file);
+            } catch {
+              toast(t('無法儲存回放檔'));
+            }
+          }}
+        >
+          {t('儲存回放檔')}
+        </ReqButton>
+        <ReqButton
+          run={async () => {
+            const f = await get();
+            if (f) openReplay(f);
+          }}
+        >
+          {t('在這裡看回放')}
+        </ReqButton>
       </div>
     </div>
   );
