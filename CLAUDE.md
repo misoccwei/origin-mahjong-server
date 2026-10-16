@@ -38,6 +38,8 @@ src/shared/      前後端共用的純函式（無 I/O）
   recommend.ts   推薦牌型（普通型）：buildTargets 各牌型評估函式（evaluate 向聽數、chance 特定牌的和牌率）、winProbability、recommendYaku、suggestPass、fastestWin
   outcome.ts     推薦牌型（進階型）：展開摸／碰／吃到和牌，逐巡算和牌率與期望得分（只算 ≤2 向聽），可帶 claim 比較鳴與不鳴
   protocol.ts    WebSocket 訊息與快照型別、PROTOCOL_VERSION
+  replaySchema.ts 回放檔格式（只有型別與 REPLAY_SCHEMA_VERSION，不 import 任何東西）
+  replay.ts      回放檔讀取（parseReplay：檢查、MIGRATIONS 舊版轉換）、匿名、播放（replayFrame：從配牌套用前 N 個事件）
   yakuInfo.ts    牌型表的說明與牌例
 src/server/
   engine/hand.ts   一局的狀態機（配牌、換三張、摸打、吃碰槓、搶槓、嶺上、流局、結果）
@@ -61,10 +63,13 @@ src/client/
 ## 必須遵守的慣例與陷阱
 
 - **協定版本**：改了 `protocol.ts` 的程式（訊息、快照欄位），或改了快照裡的 `RuleSettings` 形狀，就把 `PROTOCOL_VERSION` 加一，並依 `test/shared/protocol.test.ts` 失敗訊息更新 `RECORDED`（version 與 hash）。只改註解不必加版本（hash 已去掉註解）。目前版本：**16**。
+- **回放檔格式**：分享出去的檔案會留很久。`replaySchema.ts` 的程式（註解除外）一改，`test/shared/replay.test.ts` 就會失敗：
+  把 `REPLAY_SCHEMA_VERSION` 加一、在 `replay.ts` 的 `MIGRATIONS` 寫舊版 → 新版的轉換、放新版範例檔 `test/fixtures/replay-vN.json`（舊的保留），再更新 `RECORDED`。
+  回放只記事件、不重跑規則，所以改規則／計分／AI／協定**不必**動回放版本。
 - **新增規則設定**：`rules.ts` 的 `RuleSettings`＋`defaultSettings`＋`sanitizeSettings`（範圍檢查）→ `Lobby.tsx` 的 `SettingsForm` → 需要時 `RoomScreens.tsx` 的 `rulesSummary` → `test/shared/rules.test.ts` → 翻譯 → README → 協定版本加一。
 - **多國語言（最常踩的坑）**：
   - 所有看得到的字都要包 `t('繁中原文')`；含元件（例如牌）的用 `tn('打出 {tile}', { tile: <Tile …/> })`；變數用 `{name}`，不要用字串串接拼句子（語序不同）。
-  - 新增／修改任何中文字串都要在 `src/client/i18n/en.ts`、`ja.ts` 補翻譯；`test/client/i18n.test.tsx` 會掃描整個 `src/client`、伺服器訊息（`fail('…')`、`message:`、`reason:`、`error:`、hand.act 的 `return '…'`）、牌型名稱／說明，缺翻譯、`{變數}` 不一致、字典有多餘字串都會失敗，也會渲染英文畫面檢查沒有殘留漢字。
+  - 新增／修改任何中文字串都要在 `src/client/i18n/en.ts`、`ja.ts` 補翻譯；`test/client/i18n.test.tsx` 會掃描整個 `src/client`、伺服器訊息（`fail('…')`、`message:`、`reason:`、`error:`、hand.act 的 `return '…'`）、共用模組的 `new ReplayError('…')`、牌型名稱／說明，缺翻譯、`{變數}` 不一致、字典有多餘字串都會失敗，也會渲染英文畫面檢查沒有殘留漢字。
   - 伺服器錯誤訊息必須是**固定字串**（不要用模板字串），網頁端才能翻譯。
   - 電腦玩家名字由伺服器取為「電腦 N」，顯示一律用 `playerName(p)`；牌名用 `tileLabel(k)`；門風用 `windShort(k)`。
   - 不要在模組最外層呼叫 `t()`（只會在載入時算一次，切換語言不會更新）。
@@ -89,10 +94,11 @@ src/client/
 ## 測試結構（對應 src）
 
 ```
-test/shared/        scoring、settlement、rules、recommend、recommendShape、outcome、yakuInfo、protocol
+test/shared/        scoring、settlement、rules、recommend、recommendShape、outcome、yakuInfo、protocol、replay（格式版本、讀取、範例檔）
 test/server/engine/ hand（指定牌山情境）、match、ai（AI 決策與 autoAction）、simulation（AI 整場模擬，慢）
 test/server/        room（Room 單元測試，vi.useFakeTimers＋固定亂數）、server（WebSocket 整合）
 test/client/        table、result、screens、yakuTable、i18n（伺服器渲染快照）
+test/fixtures/      每一版回放檔格式的範例檔
 test/support/       tiles（uni('🀇🀈') 牌、meld()）、hand（buildWall/makeHand/autoplayUntil/seededRng/playMatch）、
                     wsClient（Client、newKey、waitMyTurn、answerAutoStop）、snapshots（room()/game()/player()/render()/text()/appState()）、i18nKeys
 ```

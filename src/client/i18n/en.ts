@@ -554,4 +554,8 @@ export const en: Record<string, string> = {
   '只有數牌；以對子的數字為軸，各花色牌的張數左右對稱。': 'Number tiles only; tile counts per suit are mirror-symmetric around the pair number.',
   '只有數牌；花色任意排列後，以對子為中心點，牌的分布點對稱。':
     'Number tiles only; with suits in some order, the tiles are point-symmetric around the pair.',
+  // ---- 牌局回放 ----
+  '回放檔已損毀，無法讀取': 'The replay file is damaged and cannot be read',
+  '這不是原點麻將的回放檔': 'This is not an Origin Mahjong replay file',
+  '這個回放檔來自較新的版本，請重新整理網頁後再試': 'This replay file is from a newer version. Reload the page and try again',
 };

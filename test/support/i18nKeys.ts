@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { CATEGORY_NAMES, YAKU } from '../../src/shared/scoring.js';
 import { YAKU_INFO } from '../../src/shared/yakuInfo.js';
 
-// 需要翻譯的字串：網頁程式中所有含中文的字串常值（註解除外）、伺服器送給玩家的訊息、牌型名稱／種類／說明。
+// 需要翻譯的字串：網頁程式中所有含中文的字串常值（註解除外）、伺服器送給玩家的訊息、回放檔的讀取錯誤、牌型名稱／種類／說明。
 // 翻譯以中文原文為 key，test/i18n.test.ts 用這份清單檢查英日文字典是否齊全。
 
 const CJK = /[\u3000-\u30ff\u4e00-\u9fff\uff00-\uffef]/;
@@ -47,6 +47,13 @@ export function serverKeys(): string[] {
   return out;
 }
 
+/** 共用模組丟給網頁顯示的錯誤：new ReplayError('…') */
+export function sharedKeys(): string[] {
+  return files(join(root, 'src/shared')).flatMap((f) =>
+    [...stripComments(readFileSync(f, 'utf8')).matchAll(/new ReplayError\('((?:[^'\\\n]|\\.)*)'/g)].map((m) => m[1]),
+  );
+}
+
 export function yakuKeys(): string[] {
   return [
     ...Object.values(YAKU).map((y) => y.name),
@@ -56,5 +63,5 @@ export function yakuKeys(): string[] {
 }
 
 export function allKeys(): string[] {
-  return [...new Set([...clientKeys(), ...serverKeys(), ...yakuKeys()])];
+  return [...new Set([...clientKeys(), ...serverKeys(), ...sharedKeys(), ...yakuKeys()])];
 }

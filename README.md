@@ -40,6 +40,8 @@ src/
     recommend.ts     推薦牌型（各牌型符合和牌形的向聽數、有效牌、和牌率與期望值）
     outcome.ts       推薦牌型進階型（展開摸、碰、吃到和牌，逐巡估計各打法的和牌率與期望得分）
     protocol.ts      WebSocket 訊息與狀態快照型別
+    replaySchema.ts  回放檔格式（只有型別與版本號）
+    replay.ts        回放檔的讀取（舊版轉換、檢查）與播放（套用事件算出每一步的牌桌）
   server/
     engine/hand.ts   一局的狀態機：配牌、換三張、摸打、吃碰槓、搶槓、嶺上、流局
     engine/match.ts  一場牌局：局數、起始玩家輪替、累計分數、加圈
@@ -170,19 +172,22 @@ src/
 ```
 test/
   shared/            純函式：牌型與分數（scoring）、結算（settlement）、規則設定（rules）、
-                     推薦牌型（recommend／outcome，recommendShape 驗證向聽數符合和牌形）、牌型表牌例（yakuInfo）、協定版本（protocol）
+                     推薦牌型（recommend／outcome，recommendShape 驗證向聽數符合和牌形）、牌型表牌例（yakuInfo）、協定版本（protocol）、
+                     回放檔格式版本與讀取（replay）
   server/
     engine/          一局的狀態機（hand，用指定牌山重現情境）、局數輪替（match）、
                      AI 與自動摸打（ai）、AI 打完整場的模擬（simulation，較慢）
     room.test.ts     房間的單元測試（假時鐘、固定亂數：隨機座位、結算倒數）
     server.test.ts   WebSocket 整合測試（登入、房間、觀戰、語音 signaling、斷線、整場流程）
   client/            畫面（伺服器渲染快照）：牌桌、局結果、大廳／等待房間／最終結算、牌型表、多國語言
+  fixtures/          每一版回放檔格式的範例檔（replay-v1.json…），確認舊檔轉換後仍能播完
   support/           共用工具：牌的寫法（tiles）、指定牌山與 AI 對局（hand）、WebSocket 測試客戶端（wsClient）、
                      畫面快照（snapshots）、翻譯字串清單（i18nKeys）
 ```
 
 - 畫面測試比對「看得到的文字」（`support/snapshots.tsx` 的 `text()`），不比對 React 插入的標記，改版面不會誤報。
 - 協定版本測試只看 `protocol.ts` 的程式（註解除外）；改了訊息或快照格式要把 `PROTOCOL_VERSION` 加一。
+- 回放格式版本測試只看 `replaySchema.ts`（註解除外）；改了格式要把 `REPLAY_SCHEMA_VERSION` 加一、寫轉換、放新版範例檔。
 
 ## 已支援的規則
 
