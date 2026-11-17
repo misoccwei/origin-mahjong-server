@@ -527,7 +527,7 @@ describe('對局', () => {
     expect(r.dissolved).toBe(false);
   });
 
-  it('自動摸打與自動和牌都只維持一局（下一局自動關閉）；不鳴牌一直有效', async () => {
+  it('自動摸打、自動和牌、不鳴牌都只維持一局（下一局自動關閉）', async () => {
     const host = await client('AC1');
     host.send({ t: 'createRoom', settings: { playerCount: 2, turnSeconds: 0, claimSeconds: 0, passThree: false } });
     await host.waitFor(() => host.room);
@@ -541,7 +541,7 @@ describe('對局', () => {
     const g2 = await host.waitFor(() => host.game?.handNo === 2 && host.game);
     expect(g2.auto.on).toBe(false);
     expect(g2.auto.win).toBe(false);
-    expect(g2.auto.noCall).toBe(true);
+    expect(g2.auto.noCall).toBe(false);
   });
 
   it('長考：自己的回合延長 60 秒，每局只能一次', async () => {

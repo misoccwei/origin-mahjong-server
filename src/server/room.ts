@@ -622,8 +622,8 @@ export class Room {
       const wid = `result:${m.handIndex}`;
       if (wid !== this.windowId) {
         this.windowId = wid;
-        // 自動摸打與自動和牌只維持一局：局一結束就關掉（最後一局後加一圈也不會沿用）
-        for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false);
+        // 自動摸打、自動和牌、不鳴牌只維持一局：局一結束就關掉（最後一局後加一圈也不會沿用）
+        for (const s of this.seats) if (s) (s.autoPlay = false), (s.autoWin = false), (s.noCall = false);
         const ms = this.deps.resultMs ?? this.settings.resultSeconds * 1000;
         // 單人對 AI：結算不倒數，等玩家按下一局
         this.deadline = ms > 0 && !this.isSolo() ? Date.now() + ms : null;

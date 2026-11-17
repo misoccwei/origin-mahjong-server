@@ -203,7 +203,7 @@ describe('單人對 AI', () => {
 describe('自動功能只管一局', () => {
   beforeEach(() => vi.useFakeTimers());
 
-  it('局一結束就關掉自動打、自動和；整場結束後加一圈，自動打、交給 AI 打完、電腦代打都不會沿用', () => {
+  it('局一結束就關掉自動打、自動和、不鳴牌；整場結束後加一圈，自動打、交給 AI 打完、電腦代打都不會沿用', () => {
     const room = makeRoom({ ...defaultSettings(2), rounds: 1, randomSeats: false, passThree: false }, { aiDelayMs: 10, rng: seededRng(4) });
     room.join('me', '我');
     room.addAI('me');
@@ -221,14 +221,14 @@ describe('自動功能只管一局', () => {
     room.setAIPlay('me', true);
     finishHand();
     const g = room.gameView('me')!;
-    expect(g.auto).toEqual({ on: false, win: false, noCall: true });
+    expect(g.auto).toEqual({ on: false, win: false, noCall: false });
     room.nextHand('me');
     vi.advanceTimersByTime(1);
     expect(room.status).toBe('finished');
     expect(room.extend('me')).toEqual({ ok: true });
     const g3 = room.gameView('me')!;
     expect(g3.handNo).toBe(3);
-    expect(g3.auto).toEqual({ on: false, win: false, noCall: true });
+    expect(g3.auto).toEqual({ on: false, win: false, noCall: false });
     expect(g3.fastFinish).toBe(false);
     expect(g3.aiPlay).toBe(false);
     // 輪到自己時要自己打（不會被自動打掉）
