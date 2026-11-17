@@ -176,7 +176,8 @@ table.history td.left { text-align: left; white-space: normal; min-width: 200px;
 .top-bar .round { margin-left: auto; color: #dfe9e3; white-space: nowrap; }
 .top-timer { color: var(--gold); font-size: 1.9em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .top-timer.urgent { color: #ff6b5b; }
-.gutter .top-bar { justify-content: flex-end; }
+/* 橫式右側欄可能很窄：放不下時換行（不然靠右對齊會把最前面的局數擠出左邊界） */
+.gutter .top-bar { justify-content: safe flex-end; flex-wrap: wrap; row-gap: 6px; }
 /* 單人對 AI：交給 AI 打完這一局（直式在左上，沒有倒數的位置） */
 .top-bar .fast-finish { font-weight: 600; font-size: 0.85em; white-space: nowrap; }
 .top-bar .badge.fast-finish { margin: 0; padding: 6px 12px; }
