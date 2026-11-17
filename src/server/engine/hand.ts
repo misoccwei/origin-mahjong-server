@@ -289,6 +289,7 @@ export class Hand {
     }
     this.responses.set(seat, action);
     this.pending.delete(seat);
+    if (avail.kind === 'claim') this.dropOutranked();
     if (this.pending.size === 0) {
       if (avail.kind === 'chankan') this.resolveChankan();
       else this.resolveClaims();
@@ -494,6 +495,21 @@ export class Hand {
     this.beginTurn((discarder + 1) % this.n, 'normal');
   }
 
+  /** 已經有人選了較優先的鳴牌（和 > 碰槓 > 吃）時，還沒回答、最多只能做到較低優先的人直接當作略過，不用等他們；
+   * 和牌可以多家同時和，所以能和的人仍要等 */
+  private dropOutranked() {
+    let best = 0;
+    for (const a of this.responses.values()) best = Math.max(best, claimRank(a.type));
+    if (best === 0) return;
+    for (const [seat, avail] of [...this.pending]) {
+      const max = avail.ron ? 3 : avail.pon || avail.minkan ? 2 : avail.chi?.length ? 1 : 0;
+      if (max < best) {
+        this.pending.delete(seat);
+        this.responses.set(seat, { type: 'pass' });
+      }
+    }
+  }
+
   private resolveClaims() {
     const discard = this.lastDiscard!;
     const discarder = discard.seat;
@@ -668,3 +684,6 @@ export function chiOptions(hand: TileId[], tile: TileId): [TileId, TileId][] {
 
 /** 按鈕上顯示的和牌分數與牌型 */
 const winScoreView = (s: HandScore): WinScoreView => ({ total: s.total, yaku: s.yaku.map((y) => ({ name: y.name, count: y.count })) });
+
+/** 鳴牌的優先順序：和 > 碰、槓 > 吃 > 略過 */
+const claimRank = (type: GameAction['type']) => (type === 'ron' ? 3 : type === 'pon' || type === 'minkan' ? 2 : type === 'chi' ? 1 : 0);

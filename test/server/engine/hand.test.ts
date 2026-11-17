@@ -24,6 +24,33 @@ describe('一局（指定牌山）', () => {
     expect(h.discards[0][0].called).toBe(true);
   });
 
+  it('有人碰了，只能吃的人直接取消、不用等', () => {
+    const h = makeHand([S0, '🀈🀉🀙🀚🀛🀜🀝🀞🀟🀠🀡🀖🀗', '🀇🀇🀁🀂🀃🀄🀅🀆🀐🀑🀒🀓🀘', '🀊🀋🀌🀍🀎🀏🀙🀚🀛🀜🀝🀞🀟'], '🀇');
+    h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀇') });
+    expect(h.pending.get(1)?.chi?.length).toBeGreaterThan(0);
+    expect(h.act(2, { type: 'pon' })).toBeNull();
+    expect(h.pending.has(1)).toBe(false);
+    expect(h.current).toBe(2);
+    expect(h.melds[2][0].type).toBe('pon');
+  });
+
+  it('有人和了，不能和的人直接取消；能和的人仍要等（可以多家和）', () => {
+    const h = makeHand([S0, '🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀙🀙🀚', '🀚🀚🀐🀑🀒🀓🀔🀕🀖🀗🀘🀛🀃', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀚');
+    h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀚') });
+    expect(h.pending.get(1)?.ron).toBe(true);
+    expect(h.pending.get(2)?.pon).toBe(true);
+    expect(h.pending.get(2)?.ron).toBeUndefined();
+    h.act(1, { type: 'ron' });
+    expect(h.phase).toBe('ended');
+    expect(h.result!.winners.map((w) => w.seat)).toEqual([1]);
+
+    const h2 = makeHand([S0, '🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀙🀙🀚', '🀙🀚🀛🀜🀝🀞🀟🀠🀡🀇🀈🀉🀚', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀚');
+    h2.act(0, { type: 'discard', tile: tileOf(h2, 0, '🀚') });
+    h2.act(1, { type: 'ron' });
+    expect(h2.pending.get(2)?.ron).toBe(true);
+    expect(h2.phase).toBe('claim');
+  });
+
   it('多人同時銃和', () => {
     const h = makeHand([S0, '🀇🀈🀉🀊🀋🀌🀍🀎🀏🀙🀙🀙🀚', '🀙🀚🀛🀜🀝🀞🀟🀠🀡🀇🀈🀉🀚', '🀊🀋🀌🀍🀎🀏🀖🀗🀘🀡🀡🀡🀃'], '🀚');
     expect(h.act(0, { type: 'discard', tile: tileOf(h, 0, '🀚') })).toBeNull();
